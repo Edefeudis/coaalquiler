@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Inmueble {
+  id           Int                   @id @default(autoincrement())
+  direccion    String
+  propietarios InmueblePropietario[]
+
+  // campos existentes se mantienen sin modificaciones
+}
+
+model Propietario {
+  id         Int                   @id @default(autoincrement())
+  nombre     String
+  email      String                @unique
+  inmuebles  InmueblePropietario[]
+}
+
+model InmueblePropietario {
+  inmuebleId    Int
+  propietarioId Int
+  porcentaje    Decimal @db.Decimal(5,2)
+  fechaAlta     DateTime @default(now())
+  activo        Boolean @default(true)
+
+  inmueble    Inmueble    @relation(fields: [inmuebleId], references: [id], onDelete: Cascade)
+  propietario Propietario @relation(fields: [propietarioId], references: [id], onDelete: Cascade)
+
+  @@id([inmuebleId, propietarioId])
+  @@index([inmuebleId])
+  @@index([propietarioId])
+  
+  // Constraints y validaciones
+  @@check("porcentaje > 0 AND porcentaje <= 100")
+}
