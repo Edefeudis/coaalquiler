@@ -1,6 +1,6 @@
 ## 1. Modelo de Datos y Migraciones
 
-- [ ] 1.1 Crear entidad y migración para tabla intermedia inmueble_propietarios
+- [x] 1.1 Crear entidad y migración para tabla intermedia inmueble_propietarios
 - [ ] 1.2 Agregar campo porcentaje, fecha_alta y activo a la relación
 - [ ] 1.3 Crear migración de datos: copiar propietarios existentes con 100%
 - [ ] 1.4 Implementar constraints y validaciones a nivel base de datos
