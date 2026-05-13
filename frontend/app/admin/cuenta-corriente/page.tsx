@@ -10,10 +10,19 @@ export default function AdminCuentaCorrientePage() {
   const [resumen, setResumen] = useState<any>(null);
   const [movimientos, setMovimientos] = useState<any[]>([]);
   const [showAjusteForm, setShowAjusteForm] = useState(false);
+  const [showDistribucionForm, setShowDistribucionForm] = useState(false);
+  const [showDetalleRecalculo, setShowDetalleRecalculo] = useState(false);
+  const [detalleRecalculo, setDetalleRecalculo] = useState<any>(null);
+  const [ultimaDistribucion, setUltimaDistribucion] = useState<any>(null);
   const [ajusteForm, setAjusteForm] = useState({
     propietarioId: '',
     monto: '',
     tipo: 'POSITIVO' as 'POSITIVO' | 'NEGATIVO',
+    descripcion: ''
+  });
+  const [distribucionForm, setDistribucionForm] = useState({
+    propietarioId: '',
+    monto: '',
     descripcion: ''
   });
   const router = useRouter();
@@ -137,6 +146,100 @@ export default function AdminCuentaCorrientePage() {
     }
   }
 
+  async function handleDistribucionSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:3000/api/cuenta-corriente/movimiento', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          propietarioId: parseInt(distribucionForm.propietarioId),
+          tipoMovimiento: 'DEBITO',
+          monto: parseFloat(distribucionForm.monto),
+          descripcion: distribucionForm.descripcion || 'Distribución manual de fondos'
+        })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setUltimaDistribucion(data);
+        setShowDistribucionForm(false);
+        setDistribucionForm({
+          propietarioId: '',
+          monto: '',
+          descripcion: ''
+        });
+        
+        if (selectedPropietario) {
+          fetchResumenPropietario(selectedPropietario);
+          fetchMovimientosPropietario(selectedPropietario);
+        }
+        
+        // Generar PDF automáticamente
+        await generarReciboDistribucion(data);
+        
+        alert('Distribución realizada exitosamente');
+      } else {
+        alert('Error al realizar distribución');
+      }
+    } catch (err) {
+      console.error('Error creating distribución:', err);
+      alert('Error al realizar distribución');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRecalcularSaldos() {
+    if (!selectedPropietario) {
+      alert('Seleccione un propietario primero');
+      return;
+    }
+
+    if (!confirm('¿Está seguro de recalcular todos los saldos del propietario? Esta acción puede tomar tiempo.')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      console.log(`Intentando recalcular saldos para propietario ${selectedPropietario}`);
+      
+      const res = await fetch(`http://localhost:3000/api/cuenta-corriente/propietario/${selectedPropietario}/recalcular`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      console.log('Respuesta del servidor:', res.status, res.statusText);
+      
+      if (res.ok) {
+        const data = await res.json();
+        console.log('Datos recibidos:', data);
+        setDetalleRecalculo(data);
+        setShowDetalleRecalculo(true);
+        fetchResumenPropietario(selectedPropietario);
+        fetchMovimientosPropietario(selectedPropietario);
+        alert('Saldos recalculados exitosamente');
+      } else {
+        const errorText = await res.text();
+        console.log('Error response:', errorText);
+        alert(`Error al recalcular saldos: ${res.status} - ${errorText}`);
+      }
+    } catch (err) {
+      console.error('Error recalculando saldos:', err);
+      alert(`Error al recalcular saldos: ${err.message || err}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function formatCurrency(amount: number) {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
@@ -174,6 +277,70 @@ export default function AdminCuentaCorrientePage() {
     }
   }
 
+  async function generarReciboDistribucion(distribucion: any) {
+    try {
+      console.log('Generando recibo de distribución:', distribucion);
+      
+      // Importar jsPDF dinámicamente
+      const { jsPDF } = await import('jspdf');
+      
+      const doc = new jsPDF();
+      
+      // Título
+      doc.setFontSize(20);
+      doc.text('RECIBO DE DISTRIBUCIÓN', 105, 20, { align: 'center' });
+      
+      // Información del propietario
+      doc.setFontSize(12);
+      doc.text(`Propietario: ${distribucion.propietario?.nombre || 'N/A'}`, 20, 40);
+      doc.text(`Email: ${distribucion.propietario?.email || 'N/A'}`, 20, 50);
+      
+      // Detalles de la distribución
+      doc.text(`Fecha: ${new Date(distribucion.fecha || Date.now()).toLocaleDateString('es-AR')}`, 20, 65);
+      doc.text(`Monto: ${formatCurrency(distribucion.monto)}`, 20, 75);
+      doc.text(`Descripción: ${distribucion.descripcion || 'Distribución manual de fondos'}`, 20, 85);
+      
+      // Línea separadora
+      doc.line(20, 95, 190, 95);
+      
+      // Movimientos recientes
+      doc.setFontSize(14);
+      doc.text('Movimientos Recientes', 20, 110);
+      
+      doc.setFontSize(10);
+      let yPosition = 125;
+      
+      if (movimientos.length > 0) {
+        const ultimosMovimientos = movimientos.slice(0, 5); // Últimos 5 movimientos
+        ultimosMovimientos.forEach((movimiento: any) => {
+          if (yPosition > 250) {
+            doc.addPage();
+            yPosition = 20;
+          }
+          
+          doc.text(`${new Date(movimiento.fecha).toLocaleDateString('es-AR')} - ${movimiento.tipoMovimiento}`, 20, yPosition);
+          doc.text(`${formatCurrency(movimiento.monto)} - Saldo: ${formatCurrency(movimiento.saldoNuevo)}`, 20, yPosition + 8);
+          
+          yPosition += 20;
+        });
+      } else {
+        doc.text('No hay movimientos recientes', 20, 125);
+      }
+      
+      // Footer
+      doc.setFontSize(10);
+      doc.text('Este documento es un recibo electrónico válido', 105, 280, { align: 'center' });
+      doc.text(`Generado el ${new Date().toLocaleDateString('es-AR')}`, 105, 285, { align: 'center' });
+      
+      // Guardar PDF
+      doc.save(`Recibo_Distribucion_${new Date().toISOString().split('T')[0]}.pdf`);
+      
+    } catch (err) {
+      console.error('Error generando recibo:', err);
+      alert('Error al generar recibo. Verifique la consola para más detalles.');
+    }
+  }
+
   return (
     <main className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow-sm border-b border-gray-200">
@@ -185,12 +352,29 @@ export default function AdminCuentaCorrientePage() {
               </a>
               <h1 className="text-xl font-bold text-gray-900">Cuenta Corriente</h1>
             </div>
-            <button
-              onClick={() => setShowAjusteForm(!showAjusteForm)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              {showAjusteForm ? 'Cancelar' : 'Nuevo Ajuste'}
-            </button>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setShowDistribucionForm(!showDistribucionForm)}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              >
+                {showDistribucionForm ? 'Cancelar' : 'Distribuir Fondos'}
+              </button>
+              <button
+                onClick={() => setShowAjusteForm(!showAjusteForm)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                {showAjusteForm ? 'Cancelar' : 'Ajuste Manual'}
+              </button>
+              {selectedPropietario && (
+                <button
+                  onClick={handleRecalcularSaldos}
+                  disabled={loading}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {loading ? 'Recalculando...' : 'Recalcular Saldos'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </nav>
@@ -215,6 +399,61 @@ export default function AdminCuentaCorrientePage() {
             </select>
           </div>
         </div>
+
+        {/* Formulario de distribución */}
+        {showDistribucionForm && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Distribuir Fondos</h2>
+            <form onSubmit={handleDistribucionSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Propietario</label>
+                  <select
+                    value={distribucionForm.propietarioId}
+                    onChange={e => setDistribucionForm({...distribucionForm, propietarioId: e.target.value})}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Seleccionar propietario</option>
+                    {propietarios.map((propietario) => (
+                      <option key={propietario.id} value={propietario.id}>
+                        {propietario.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Monto a distribuir ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={distribucionForm.monto}
+                    onChange={e => setDistribucionForm({...distribucionForm, monto: e.target.value})}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                <input
+                  type="text"
+                  value={distribucionForm.descripcion}
+                  onChange={e => setDistribucionForm({...distribucionForm, descripcion: e.target.value})}
+                  placeholder="Descripción de la distribución"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+              >
+                {loading ? 'Distribuyendo...' : 'Distribuir Fondos'}
+              </button>
+            </form>
+          </div>
+        )}
 
         {/* Formulario de ajuste manual */}
         {showAjusteForm && (
@@ -343,6 +582,121 @@ export default function AdminCuentaCorrientePage() {
           </div>
         )}
 
+        {/* Detalle del recálculo */}
+        {showDetalleRecalculo && detalleRecalculo && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Detalle del Recálculo de Saldos</h2>
+              <button
+                onClick={() => setShowDetalleRecalculo(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Resumen general */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-green-50 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-green-800 mb-2">Total Cobros</h3>
+                <p className="text-2xl font-bold text-green-900">
+                  {formatCurrency(detalleRecalculo.totalCobrosPropietario)}
+                </p>
+              </div>
+              <div className="bg-red-50 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-red-800 mb-2">Total Gastos</h3>
+                <p className="text-2xl font-bold text-red-900">
+                  {formatCurrency(detalleRecalculo.totalGastosPropietario)}
+                </p>
+              </div>
+              <div className="bg-orange-50 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-orange-800 mb-2">Distribuciones Realizadas</h3>
+                <p className="text-2xl font-bold text-orange-900">
+                  {formatCurrency(detalleRecalculo.totalDistribucionesPropietario)}
+                </p>
+              </div>
+              <div className={`${(detalleRecalculo.saldoDisponible || detalleRecalculo.saldoFinal) >= 0 ? 'bg-blue-50' : 'bg-red-50'} rounded-lg p-4`}>
+                <h3 className={`text-sm font-medium mb-2 ${(detalleRecalculo.saldoDisponible || detalleRecalculo.saldoFinal) >= 0 ? 'text-blue-800' : 'text-red-800'}`}>
+                  Saldo Disponible
+                </h3>
+                <p className={`text-2xl font-bold ${(detalleRecalculo.saldoDisponible || detalleRecalculo.saldoFinal) >= 0 ? 'text-blue-900' : 'text-red-900'}`}>
+                  {formatCurrency(detalleRecalculo.saldoDisponible || detalleRecalculo.saldoFinal)}
+                </p>
+                <p className="text-xs text-gray-600 mt-1">
+                  Total Cobros - (Total Gastos + Distribuciones)
+                </p>
+              </div>
+            </div>
+
+            {/* Detalle por inmueble */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Detalle por Inmueble</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Inmueble
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Porcentaje
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Total Cobros
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Cobros Propietario
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Total Gastos
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Gastos Propietario
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Distribuciones
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Saldo
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {detalleRecalculo.detallesPorInmueble.map((detalle: any, index: number) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {detalle.inmueble.direccion}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {detalle.porcentaje}%
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatCurrency(detalle.totalCobros)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                          {formatCurrency(detalle.cobrosPropietario)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatCurrency(detalle.totalGastos)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
+                          {formatCurrency(detalle.gastosPropietario)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600 font-medium">
+                          {formatCurrency(detalle.totalDistribuciones)}
+                        </td>
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${detalle.saldoActual >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                          {formatCurrency(detalle.saldoActual)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Movimientos */}
         {movimientos.length > 0 && (
           <div className="bg-white rounded-lg shadow-md p-6">
@@ -393,6 +747,26 @@ export default function AdminCuentaCorrientePage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Recibo de última distribución */}
+        {ultimaDistribucion && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-medium text-green-800">Última Distribución Realizada</h3>
+                <p className="text-lg font-bold text-green-900">
+                  {formatCurrency(ultimaDistribucion.monto)} - {new Date(ultimaDistribucion.fecha).toLocaleDateString('es-AR')}
+                </p>
+              </div>
+              <button
+                onClick={() => generarReciboDistribucion(ultimaDistribucion)}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              >
+                Descargar Recibo
+              </button>
             </div>
           </div>
         )}

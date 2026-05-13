@@ -81,4 +81,10 @@ export class CuentaCorrienteController {
   async obtenerSaldosPorInmueble(@Param('inmuebleId', ParseIntPipe) inmuebleId: number) {
     return this.cuentaCorrienteService.obtenerSaldosPorInmueble(inmuebleId);
   }
+
+  @Roles(Rol.ADMIN, Rol.EMPLEADO)
+  @Post('propietario/:propietarioId/recalcular')
+  async recalcularSaldos(@Param('propietarioId', ParseIntPipe) propietarioId: number) {
+    return this.cuentaCorrienteService.recalcularSaldos(propietarioId);
+  }
 }

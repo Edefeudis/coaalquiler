@@ -11,10 +11,11 @@ export default function AdminCobrosPage() {
   const [gastos, setGastos] = useState<any[]>([]);
   const [ultimoCobro, setUltimoCobro] = useState<any>(null);
   const [variacion, setVariacion] = useState<number | null>(null);
-  const [formData, setFormData] = useState({ 
+  const [formData, setFormData] = useState({
     inmuebleId: '', 
     periodo: '', 
     montoBruto: '', 
+    montoCobrado: '',
     fechaCobro: '' 
   });
   const [periodoSeleccionado, setPeriodoSeleccionado] = useState('');
@@ -254,13 +255,14 @@ export default function AdminCobrosPage() {
           inmuebleId: parseInt(formData.inmuebleId),
           periodo: formData.periodo,
           montoBruto: parseFloat(formData.montoBruto),
+          montoCobrado: parseFloat(formData.montoCobrado),
           fechaCobro: formData.fechaCobro ? new Date(formData.fechaCobro) : undefined
         })
       });
       
       if (res.ok) {
         setShowForm(false);
-        setFormData({ inmuebleId: '', periodo: '', montoBruto: '', fechaCobro: '' });
+        setFormData({ inmuebleId: '', periodo: '', montoBruto: '', montoCobrado: '', fechaCobro: '' });
         setVariacion(null);
         if (formData.inmuebleId) {
           fetchCobros(parseInt(formData.inmuebleId));
@@ -293,33 +295,62 @@ export default function AdminCobrosPage() {
   }
 
   async function generarReportePDF() {
-    if (!periodoSeleccionado) return;
+    if (!detalleInmuebles || detalleInmuebles.length === 0) {
+      alert('No hay datos para exportar. Seleccione un período con cobros.');
+      return;
+    }
     
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/api/cobros/exportar-pdf?periodo=${periodoSeleccionado}`, {
-        headers: { 
-          'Authorization': `Bearer ${token}`
+      console.log('Generando PDF con datos:', detalleInmuebles);
+      
+      // Importar jsPDF dinámicamente
+      const { jsPDF } = await import('jspdf');
+      
+      const doc = new jsPDF();
+      
+      // Título
+      doc.setFontSize(20);
+      doc.text('Reporte de Cobros y Gastos', 105, 20, { align: 'center' });
+      
+      // Período
+      doc.setFontSize(14);
+      doc.text(`Período: ${periodoSeleccionado}`, 105, 30, { align: 'center' });
+      doc.text(`Fecha: ${new Date().toLocaleDateString('es-AR')}`, 105, 40, { align: 'center' });
+      
+      // Resumen general
+      const totalCobros = detalleInmuebles.reduce((sum, item) => sum + item.totales.totalCobros, 0);
+      const totalGastos = detalleInmuebles.reduce((sum, item) => sum + item.totales.totalGastos, 0);
+      const saldoNeto = detalleInmuebles.reduce((sum, item) => sum + item.totales.saldoNeto, 0);
+      
+      doc.setFontSize(12);
+      doc.text('RESUMEN GENERAL', 20, 60);
+      doc.text(`Total Cobrado: $${totalCobros.toLocaleString('es-AR')}`, 20, 70);
+      doc.text(`Total Gastos: $${totalGastos.toLocaleString('es-AR')}`, 20, 80);
+      doc.text(`Saldo Neto: $${saldoNeto.toLocaleString('es-AR')}`, 20, 90);
+      
+      // Detalle por inmueble
+      let yPosition = 110;
+      detalleInmuebles.forEach((detalle, index) => {
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
         }
+        
+        doc.setFontSize(12);
+        doc.text(`${index + 1}. ${detalle.inmueble.direccion}`, 20, yPosition);
+        doc.text(`Cobros: $${detalle.totales.totalCobros.toLocaleString('es-AR')}`, 20, yPosition + 10);
+        doc.text(`Gastos: $${detalle.totales.totalGastos.toLocaleString('es-AR')}`, 20, yPosition + 20);
+        doc.text(`Saldo: $${detalle.totales.saldoNeto.toLocaleString('es-AR')}`, 20, yPosition + 30);
+        
+        yPosition += 50;
       });
       
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Reporte_Cobros_Gastos_${periodoSeleccionado}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        console.error('Error exporting PDF');
-        alert('Error al generar PDF');
-      }
+      // Guardar PDF
+      doc.save(`Reporte_Cobros_Gastos_${periodoSeleccionado}.pdf`);
+      
     } catch (err) {
-      console.error('Error exporting PDF:', err);
-      alert('Error al generar PDF');
+      console.error('Error generando PDF:', err);
+      alert('Error al generar PDF. Verifique la consola para más detalles.');
     }
   }
 
@@ -459,6 +490,17 @@ export default function AdminCobrosPage() {
                     type="date"
                     value={formData.fechaCobro}
                     onChange={e => setFormData({...formData, fechaCobro: e.target.value})}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Importe Cobrado</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.montoCobrado}
+                    onChange={e => setFormData({...formData, montoCobrado: e.target.value})}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />

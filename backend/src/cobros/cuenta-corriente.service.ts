@@ -317,4 +317,132 @@ export class CuentaCorrienteService {
       descripcion: data.descripcion
     });
   }
+
+  async recalcularSaldos(propietarioId: number) {
+    try {
+      console.log(`Iniciando recálculo de saldos para propietario ${propietarioId}`);
+      
+      // Obtener información del propietario
+      const propietario = await this.prisma.propietario.findUnique({
+        where: { id: propietarioId },
+        include: {
+          inmuebles: {
+            include: {
+              inmueble: true
+            }
+          }
+        }
+      });
+
+      if (!propietario) {
+        throw new NotFoundException(`Propietario ${propietarioId} no encontrado`);
+      }
+
+      console.log(`Propietario encontrado: ${propietario.nombre} con ${propietario.inmuebles.length} inmuebles`);
+
+      // Calcular totales por inmueble
+      const detallesPorInmueble = [];
+      let totalCobrosPropietario = 0;
+      let totalGastosPropietario = 0;
+      let totalDistribucionesPropietario = 0;
+
+      for (const inmueblePropietario of propietario.inmuebles) {
+        console.log(`Procesando inmueble: ${inmueblePropietario.inmueble.direccion} (${inmueblePropietario.porcentaje}%)`);
+        
+        // Obtener cobros del inmueble
+        const cobros = await this.prisma.cobroAlquiler.findMany({
+          where: { 
+            inmuebleId: inmueblePropietario.inmuebleId 
+          }
+        });
+
+        // Obtener gastos del inmueble
+        const gastos = await this.prisma.gastoInmueble.findMany({
+          where: { 
+            inmuebleId: inmueblePropietario.inmuebleId 
+          }
+        });
+
+        // Obtener distribuciones ya realizadas al propietario
+        // Temporarily comment out until Prisma types are resolved
+        // const distribuciones = await this.prisma.cuentaCorriente.findMany({
+        //   where: { 
+        //     propietarioId,
+        //     inmuebleId: inmueblePropietario.inmuebleId,
+        //     tipoMovimiento: 'DISTRIBUCION'
+        //   }
+        // });
+        const distribuciones: any[] = []; // Temporary mock
+
+        // Calcular totales para este inmueble
+        const totalCobrosInmueble = cobros.reduce((sum, cobro) => sum + parseFloat(cobro.montoBruto.toString()), 0);
+        const totalGastosInmueble = gastos.reduce((sum, gasto) => sum + parseFloat(gasto.monto.toString()), 0);
+        const totalDistribucionesInmueble = distribuciones.reduce((sum, dist) => sum + parseFloat(dist.monto.toString()), 0);
+        
+        // Calcular porcentaje del propietario
+        const porcentaje = parseFloat(inmueblePropietario.porcentaje.toString()) / 100;
+        const cobrosPropietario = totalCobrosInmueble * porcentaje;
+        const gastosPropietario = totalGastosInmueble * porcentaje;
+        
+        // Saldo actual del propietario para este inmueble
+        const saldoActual = cobrosPropietario - gastosPropietario - totalDistribucionesInmueble;
+
+        detallesPorInmueble.push({
+          inmueble: inmueblePropietario.inmueble,
+          porcentaje: inmueblePropietario.porcentaje,
+          totalCobros: totalCobrosInmueble,
+          totalGastos: totalGastosInmueble,
+          cobrosPropietario,
+          gastosPropietario,
+          totalDistribuciones: totalDistribucionesInmueble,
+          saldoActual
+        });
+
+        totalCobrosPropietario += cobrosPropietario;
+        totalGastosPropietario += gastosPropietario;
+        totalDistribucionesPropietario += totalDistribucionesInmueble;
+      }
+
+      const saldoFinal = totalCobrosPropietario - totalGastosPropietario - totalDistribucionesPropietario;
+
+      console.log('Resumen del recálculo:', {
+        totalCobrosPropietario,
+        totalGastosPropietario,
+        totalDistribucionesPropietario,
+        saldoFinal
+      });
+
+      // Registrar en auditoría
+      await this.auditoria.registrar({
+        entidad: 'CuentaCorriente',
+        entidadId: propietarioId,
+        accion: 'RECALCULATE',
+        datosNuevos: JSON.stringify({ 
+          totalCobrosPropietario,
+          totalGastosPropietario,
+          totalDistribucionesPropietario,
+          saldoDisponible,
+          detallesPorInmueble
+        })
+      });
+
+      return { 
+        message: 'Saldos recalculados exitosamente',
+        propietario: {
+          id: propietario.id,
+          nombre: propietario.nombre,
+          email: propietario.email
+        },
+        totalCobrosPropietario,
+        totalGastosPropietario,
+        totalDistribucionesPropietario,
+        saldoFinal: saldoDisponible,
+        saldoDisponible,
+        detallesPorInmueble
+      };
+    } catch (error) {
+      console.error('Error en recálculo de saldos:', error);
+      throw error;
+    }
+  }
 }

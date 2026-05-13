@@ -122,6 +122,17 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Cuenta Corriente</h3>
+            <p className="text-gray-600 mb-4">Gestión de saldos y movimientos de propietarios</p>
+            <a
+              href="/admin/cuenta-corriente"
+              className="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Gestionar →
+            </a>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Auditoría</h3>
             <p className="text-gray-600 mb-4">Historial de cambios y operaciones</p>
             <a
