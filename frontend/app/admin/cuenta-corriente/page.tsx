@@ -56,19 +56,43 @@ export default function AdminCuentaCorrientePage() {
   async function fetchResumenPropietario(propietarioId: number) {
     try {
       const token = localStorage.getItem('token');
+      console.log('fetchResumenPropietario llamado con ID:', propietarioId);
       const res = await fetch(`http://localhost:3000/api/cuenta-corriente/propietario/${propietarioId}/resumen`, {
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
+      console.log('Respuesta resumen:', res.status, res.statusText);
       if (res.ok) {
         const data = await res.json();
+        console.log('Datos resumen:', data);
         setResumen(data);
+      } else {
+        console.error('Error en respuesta:', res.status);
       }
     } catch (err) {
       console.error('Error fetching resumen:', err);
     }
+  }
+
+  async function fetchSaldoPropietario(propietarioId: number): Promise<number> {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:3000/api/cuenta-corriente/propietario/${propietarioId}/saldo`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // El endpoint puede devolver un número directo o un objeto { saldo }
+        return typeof data === 'number' ? data : (data.saldo || 0);
+      }
+    } catch (err) {
+      console.error('Error fetching saldo:', err);
+    }
+    return 0;
   }
 
   async function fetchMovimientosPropietario(propietarioId: number) {
@@ -90,12 +114,16 @@ export default function AdminCuentaCorrientePage() {
   }
 
   async function handlePropietarioChange(propietarioId: string) {
+    console.log('handlePropietarioChange llamado con:', propietarioId);
     const id = parseInt(propietarioId);
+    console.log('ID parseado:', id, 'type:', typeof id);
     setSelectedPropietario(id);
-    if (id) {
+    if (id && !isNaN(id)) {
+      console.log('Cargando datos para propietario:', id);
       fetchResumenPropietario(id);
       fetchMovimientosPropietario(id);
     } else {
+      console.log('No hay ID válido, limpiando datos');
       setResumen(null);
       setMovimientos([]);
     }
@@ -195,6 +223,36 @@ export default function AdminCuentaCorrientePage() {
     }
   }
 
+  async function eliminarDistribucion(id: number) {
+    if (!confirm('¿Está seguro de eliminar esta distribución? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:3000/api/cuenta-corriente/movimiento/${id}`, {
+        method: 'DELETE',
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (res.ok) {
+        alert('Distribución eliminada exitosamente');
+        if (selectedPropietario) {
+          fetchResumenPropietario(selectedPropietario);
+          fetchMovimientosPropietario(selectedPropietario);
+        }
+      } else {
+        const errorText = await res.text();
+        alert(`Error al eliminar distribución: ${errorText}`);
+      }
+    } catch (err: any) {
+      console.error('Error eliminando distribución:', err);
+      alert(`Error al eliminar distribución: ${err.message || err}`);
+    }
+  }
+
   async function handleRecalcularSaldos() {
     if (!selectedPropietario) {
       alert('Seleccione un propietario primero');
@@ -232,7 +290,7 @@ export default function AdminCuentaCorrientePage() {
         console.log('Error response:', errorText);
         alert(`Error al recalcular saldos: ${res.status} - ${errorText}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error recalculando saldos:', err);
       alert(`Error al recalcular saldos: ${err.message || err}`);
     } finally {
@@ -274,6 +332,115 @@ export default function AdminCuentaCorrientePage() {
         return '↓';
       default:
         return '→';
+    }
+  }
+
+  async function generarEstadoCuenta() {
+    if (!selectedPropietario || !propietarios) return;
+
+    const propietario = propietarios.find(p => p.id === selectedPropietario);
+    if (!propietario) return;
+
+    try {
+      const { jsPDF } = await import('jspdf');
+
+      const doc = new jsPDF();
+
+      // Título
+      doc.setFontSize(20);
+      doc.text('ESTADO DE CUENTA', 105, 20, { align: 'center' });
+
+      // Datos del propietario
+      doc.setFontSize(14);
+      doc.text(`Propietario: ${propietario.nombre}`, 20, 35);
+      doc.setFontSize(11);
+      doc.text(`Email: ${propietario.email}`, 20, 45);
+      doc.text(`Generado: ${new Date().toLocaleDateString('es-AR')} ${new Date().toLocaleTimeString('es-AR')}`, 20, 55);
+
+      // Resumen
+      doc.setFontSize(14);
+      doc.text('RESUMEN', 20, 70);
+      doc.setFontSize(12);
+      
+      let totalCreditos = 0;
+      let totalDebitos = 0;
+      for (const mov of movimientos) {
+        if (mov.tipoMovimiento === 'CREDITO' || mov.tipoMovimiento === 'DISTRIBUCION' || mov.tipoMovimiento === 'AJUSTE_POSITIVO') {
+          totalCreditos += mov.monto;
+        } else {
+          totalDebitos += mov.monto;
+        }
+      }
+      const saldoFinal = totalCreditos - totalDebitos;
+
+      doc.text(`Total Créditos: $${totalCreditos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 20, 82);
+      doc.text(`Total Débitos: $${totalDebitos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 20, 92);
+      doc.text(`Saldo Final: $${saldoFinal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 20, 102);
+
+      // Línea separadora
+      doc.line(20, 110, 190, 110);
+
+      // Movimientos
+      doc.setFontSize(14);
+      doc.text('MOVIMIENTOS', 20, 122);
+      doc.setFontSize(10);
+      
+      if (movimientos.length === 0) {
+        doc.text('No hay movimientos registrados', 20, 135);
+      } else {
+        // Encabezados de tabla
+        doc.setFontSize(9);
+        doc.text('Fecha', 20, 135);
+        doc.text('Tipo', 50, 135);
+        doc.text('Descripción', 75, 135);
+        doc.text('Monto', 170, 135, { align: 'right' });
+        doc.line(20, 138, 190, 138);
+
+        let yPosition = 145;
+        const displayedMovimientos = movimientos.slice(0, 30); // Últimos 30 movimientos
+
+        doc.setFontSize(8);
+        for (const mov of displayedMovimientos) {
+          if (yPosition > 260) {
+            doc.addPage();
+            yPosition = 20;
+            // Repetir encabezados en nueva página
+            doc.setFontSize(9);
+            doc.text('Fecha', 20, yPosition);
+            doc.text('Tipo', 50, yPosition);
+            doc.text('Descripción', 75, yPosition);
+            doc.text('Monto', 170, yPosition, { align: 'right' });
+            yPosition += 5;
+            doc.line(20, yPosition, 190, yPosition);
+            yPosition += 5;
+            doc.setFontSize(8);
+          }
+
+          const fecha = new Date(mov.fecha).toLocaleDateString('es-AR');
+          const tipo = mov.tipoMovimiento;
+          const desc = (mov.descripcion || mov.referencia || '-').substring(0, 40);
+          const monto = `$${mov.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+          const signo = (mov.tipoMovimiento === 'CREDITO' || mov.tipoMovimiento === 'DISTRIBUCION' || mov.tipoMovimiento === 'AJUSTE_POSITIVO') ? '+' : '-';
+
+          doc.text(fecha, 20, yPosition);
+          doc.text(tipo, 50, yPosition);
+          doc.text(desc, 75, yPosition);
+          doc.text(`${signo} ${monto}`, 170, yPosition, { align: 'right' });
+
+          yPosition += 8;
+        }
+      }
+
+      // Footer
+      doc.setFontSize(10);
+      doc.text('Este documento es un estado de cuenta electrónico válido', 105, 280, { align: 'center' });
+
+      // Guardar PDF
+      doc.save(`Estado_Cuenta_${propietario.nombre.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+
+    } catch (err) {
+      console.error('Error generando estado de cuenta:', err);
+      alert('Error al generar estado de cuenta. Verifique la consola para más detalles.');
     }
   }
 
@@ -366,13 +533,21 @@ export default function AdminCuentaCorrientePage() {
                 {showAjusteForm ? 'Cancelar' : 'Ajuste Manual'}
               </button>
               {selectedPropietario && (
-                <button
-                  onClick={handleRecalcularSaldos}
-                  disabled={loading}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
-                >
-                  {loading ? 'Recalculando...' : 'Recalcular Saldos'}
-                </button>
+                <>
+                  <button
+                    onClick={generarEstadoCuenta}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                  >
+                    Estado de Cuenta
+                  </button>
+                  <button
+                    onClick={handleRecalcularSaldos}
+                    disabled={loading}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    {loading ? 'Recalculando...' : 'Recalcular Saldos'}
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -410,7 +585,15 @@ export default function AdminCuentaCorrientePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Propietario</label>
                   <select
                     value={distribucionForm.propietarioId}
-                    onChange={e => setDistribucionForm({...distribucionForm, propietarioId: e.target.value})}
+                    onChange={async e => {
+                      const propietarioId = e.target.value;
+                      setDistribucionForm({...distribucionForm, propietarioId, monto: '', descripcion: ''});
+                      if (propietarioId) {
+                        const saldo = await fetchSaldoPropietario(parseInt(propietarioId));
+                        console.log('Saldo obtenido:', saldo);
+                        setDistribucionForm(prev => ({...prev, monto: saldo.toString()}));
+                      }
+                    }}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
@@ -432,6 +615,11 @@ export default function AdminCuentaCorrientePage() {
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  {distribucionForm.propietarioId && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Saldo disponible sugeridor - puede modificar
+                    </p>
+                  )}
                 </div>
               </div>
               <div>
@@ -720,6 +908,9 @@ export default function AdminCuentaCorrientePage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Saldo
                     </th>
+                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Acción
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -743,6 +934,16 @@ export default function AdminCuentaCorrientePage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {formatCurrency(movimiento.saldoNuevo)}
                       </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {movimiento.tipoMovimiento === 'DEBITO' && (
+                            <button
+                              onClick={() => eliminarDistribucion(movimiento.referenciaId || movimiento.id)}
+                              className="text-red-600 hover:text-red-800 font-medium"
+                            >
+                              Eliminar
+                            </button>
+                          )}
+                        </td>
                     </tr>
                   ))}
                 </tbody>

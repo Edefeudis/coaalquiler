@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
 import { CuentaCorrienteService } from './cuenta-corriente.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -86,5 +86,11 @@ export class CuentaCorrienteController {
   @Post('propietario/:propietarioId/recalcular')
   async recalcularSaldos(@Param('propietarioId', ParseIntPipe) propietarioId: number) {
     return this.cuentaCorrienteService.recalcularSaldos(propietarioId);
+  }
+
+  @Roles(Rol.ADMIN, Rol.EMPLEADO)
+  @Delete('movimiento/:id')
+  async eliminarMovimiento(@Param('id', ParseIntPipe) id: number) {
+    return this.cuentaCorrienteService.eliminarMovimiento(id);
   }
 }

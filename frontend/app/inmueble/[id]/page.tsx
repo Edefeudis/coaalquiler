@@ -3,13 +3,24 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
+interface Distribucion {
+  id: number;
+  propietario: { id: number; nombre: string; email: string };
+  porcentaje: number;
+  montoAsignado: number;
+  gastosDeducidos: number;
+  montoNeto: number;
+}
+
 interface Cobro {
   id: number;
   periodo: string;
   montoBruto: number;
   montoNeto: number;
+  gastosTotal: number;
   estado: string;
   fechaCobro: string;
+  distribuciones: Distribucion[];
 }
 
 interface Gasto {

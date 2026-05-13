@@ -92,13 +92,15 @@ model CobroAlquiler {
 }
 
 model DistribucionCobro {
-  id              Int     @id @default(autoincrement())
+  id              Int       @id @default(autoincrement())
   cobroId         Int
   propietarioId   Int
   montoAsignado   Decimal
   porcentaje      Decimal
-  gastosDeducidos Decimal @default(0)
+  gastosDeducidos Decimal   @default(0)
   montoNeto       Decimal
+  descripcion    String?
+  createdAt       DateTime  @default(now())
 
   cobro       CobroAlquiler @relation(fields: [cobroId], references: [id], onDelete: Cascade)
   propietario Propietario   @relation(fields: [propietarioId], references: [id], onDelete: Cascade)
@@ -106,6 +108,25 @@ model DistribucionCobro {
   @@unique([cobroId, propietarioId])
   @@index([cobroId])
   @@index([propietarioId])
+}
+
+model CuentaCorriente {
+  id              Int       @id @default(autoincrement())
+  propietarioId   Int
+  inmuebleId      Int?
+  tipoMovimiento String    // CREDITO, DEBITO, GASTO, DISTRIBUCION, AJUSTE_POSITIVO, AJUSTE_NEGATIVO
+  monto           Decimal
+  saldoAnterior   Decimal
+  saldoNuevo      Decimal
+  referencia      String?
+  referenciaId    Int?
+  descripcion     String?
+  fecha           DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+
+  @@index([propietarioId])
+  @@index([inmuebleId])
+  @@index([fecha])
 }
 
 model LogAuditoria {

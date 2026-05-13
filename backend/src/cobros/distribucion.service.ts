@@ -112,6 +112,9 @@ export class DistribucionService{
     return this.prisma.distribucionCobro.findMany({
       where: { propietarioId },
       include: { 
+        propietario: {
+          select: { id: true, nombre: true, email: true }
+        },
         cobro: { 
           include: { 
             inmueble: { 
