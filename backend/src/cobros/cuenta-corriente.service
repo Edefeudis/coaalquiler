@@ -1,0 +1,59 @@
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class CuentaCorrienteService {
+  constructor() {}
+
+  async obtenerSaldoActual(propietarioId: number, inmuebleId?: number) {
+    // Temporarily return 0 until Prisma client is generated
+    return 0;
+  }
+
+  async obtenerMovimientosPorPropietario(propietarioId: number, inmuebleId?: number) {
+    // Temporarily return empty array until Prisma client is generated
+    return [];
+  }
+
+  async registrarMovimiento(data: {
+    propietarioId: number;
+    inmuebleId?: number;
+    tipoMovimiento: string;
+    monto: number;
+    referencia?: string;
+    referenciaId?: number;
+    descripcion?: string;
+  }) {
+    // Temporarily return mock data until Prisma client is generated
+    console.log(`Registrando movimiento en cuenta corriente:`, data);
+    
+    return { 
+      id: Math.floor(Math.random() * 1000),
+      ...data,
+      saldoAnterior: 0,
+      saldoNuevo: data.monto,
+      createdAt: new Date()
+    };
+  }
+
+  async registrarDistribucionCobro(cobroId: number, distribucionId: number) {
+    // Temporarily return mock data until Prisma client is generated
+    return this.registrarMovimiento({
+      propietarioId: 1,
+      inmuebleId: 1,
+      tipoMovimiento: 'DISTRIBUCION',
+      monto: 1000,
+      referencia: `Cobro ${cobroId}`,
+      referenciaId: cobroId,
+      descripcion: `Distribución de cobro`
+    });
+  }
+
+  async obtenerResumenPropietario(propietarioId: number) {
+    // Temporarily return mock data until Prisma client is generated
+    return {
+      saldoGeneral: 0,
+      saldosPorInmueble: [],
+      ultimosMovimientos: []
+    };
+  }
+}

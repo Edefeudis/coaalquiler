@@ -3,28 +3,34 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
+  url      = "file:./prisma/dev.db"
 }
 
 model Inmueble {
   id           Int                   @id @default(autoincrement())
   direccion    String
   propietarios InmueblePropietario[]
+  gastos       GastoInmueble[]
+  cobros       CobroAlquiler[]
+  cuentaCorriente CuentaCorriente[]
 
   // campos existentes se mantienen sin modificaciones
 }
-
+   
 model Propietario {
-  id         Int                   @id @default(autoincrement())
-  nombre     String
-  email      String                @unique
-  inmuebles  InmueblePropietario[]
+  id             Int                   @id @default(autoincrement())
+  nombre         String
+  email          String                @unique
+  inmuebles      InmueblePropietario[]
+  distribuciones DistribucionCobro[]
+  cuentaCorriente CuentaCorriente[]
 }
 
 model InmueblePropietario {
   inmuebleId    Int
   propietarioId Int
-  porcentaje    Decimal @db.Decimal(5,2)
+  porcentaje    Decimal
   fechaAlta     DateTime @default(now())
   activo        Boolean @default(true)
 
@@ -36,5 +42,113 @@ model InmueblePropietario {
   @@index([propietarioId])
   
   // Constraints y validaciones
-  @@check("porcentaje > 0 AND porcentaje <= 100")
+}
+
+model GastoInmueble {
+  id          Int      @id @default(autoincrement())
+  inmuebleId  Int
+  concepto    String
+  monto       Decimal
+  fecha       DateTime @default(now())
+  descripcion String?
+  createdAt   DateTime @default(now())
+
+  inmueble Inmueble @relation(fields: [inmuebleId], references: [id], onDelete: Cascade)
+
+  @@index([inmuebleId])
+  @@index([fecha])
+}
+
+model CobroAlquiler {
+  id           Int      @id @default(autoincrement())
+  inmuebleId   Int
+  periodo      String   // formato "YYYY-MM"
+  montoBruto   Decimal
+  montoNeto    Decimal
+  fechaCobro   DateTime @default(now())
+  gastosTotal  Decimal  @default(0)
+  estado       String   @default("PENDIENTE") // PENDIENTE, DISTRIBUIDO, FACTURADO
+  createdAt    DateTime @default(now())
+
+  inmueble      Inmueble          @relation(fields: [inmuebleId], references: [id], onDelete: Cascade)
+  distribuciones DistribucionCobro[]
+  factura       FacturaElectronica?
+
+  @@index([inmuebleId])
+  @@index([periodo])
+  @@index([estado])
+}
+
+model DistribucionCobro {
+  id              Int     @id @default(autoincrement())
+  cobroId         Int
+  propietarioId   Int
+  montoAsignado   Decimal
+  porcentaje      Decimal
+  gastosDeducidos Decimal @default(0)
+  montoNeto       Decimal
+
+  cobro       CobroAlquiler @relation(fields: [cobroId], references: [id], onDelete: Cascade)
+  propietario Propietario   @relation(fields: [propietarioId], references: [id], onDelete: Cascade)
+
+  @@unique([cobroId, propietarioId])
+  @@index([cobroId])
+  @@index([propietarioId])
+}
+
+model LogAuditoria {
+  id          Int      @id @default(autoincrement())
+  entidad     String   // nombre de la tabla/entidad
+  entidadId   Int?
+  accion      String   // CREATE, UPDATE, DELETE, DISTRIBUCION, FACTURACION
+  usuarioId   Int?
+  usuarioRol  String?
+  datosPrevios String?
+  datosNuevos  String?
+  createdAt   DateTime @default(now())
+
+  @@index([entidad])
+  @@index([accion])
+  @@index([createdAt])
+}
+
+model FacturaElectronica {
+  id            Int     @id @default(autoincrement())
+  cobroId       Int     @unique
+  numeroFactura String?
+  cae           String?
+  estado        String  @default("PENDIENTE") // PENDIENTE, ENVIADA, APROBADA, RECHAZADA, ERROR
+  intentos      Int     @default(0)
+  ultimoError   String?
+  respuestaArca String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  cobro CobroAlquiler @relation(fields: [cobroId], references: [id], onDelete: Cascade)
+
+  @@index([estado])
+  @@index([cae])
+}
+
+model CuentaCorriente {
+  id              Int      @id @default(autoincrement())
+  propietarioId   Int
+  inmuebleId      Int?
+  tipoMovimiento  String   // CREDITO, DEBITO, DISTRIBUCION, GASTO, AJUSTE
+  monto           Decimal
+  saldoAnterior   Decimal  @default(0)
+  saldoNuevo      Decimal
+  referencia      String?  // referencia al cobro, gasto, o distribución
+  referenciaId    Int?     // ID de la entidad de referencia
+  descripcion     String?
+  fecha           DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  propietario Propietario @relation(fields: [propietarioId], references: [id], onDelete: Cascade)
+  inmueble   Inmueble?   @relation(fields: [inmuebleId], references: [id], onDelete: Cascade)
+
+  @@index([propietarioId])
+  @@index([inmuebleId])
+  @@index([tipoMovimiento])
+  @@index([fecha])
 }

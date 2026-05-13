@@ -52,7 +52,7 @@ export class PropietariosService{
    */
   async agregarCopropietario(inmuebleId:number,propietarioId:number,porcentaje:number){
     // Verificar que el inmueble existe
-    const inmueble=await this.prisma.inmueble.findUnique({where:{id:inmuebleId}};
+    const inmueble=await this.prisma.inmueble.findUnique({where:{id:inmuebleId}});
     if(!inmueble)throw new NotFoundException(`Inmueble ${inmuebleId} no encontrado`);
 
     // Verificar que el propietario existe
@@ -174,5 +174,28 @@ export class PropietariosService{
 
     const suma=propietarios.reduce((acc,p)=>acc+Number(p.porcentaje),0);
     return{valido:suma===100,suma,total:propietarios.length};
+  }
+
+  /**
+   * Elimina un propietario (solo si no tiene inmuebles asociados)
+   */
+  async delete(id:number){
+    const propietario=await this.prisma.propietario.findUnique({where:{id}});
+    if(!propietario){
+      throw new NotFoundException(`Propietario ${id} no encontrado`);
+    }
+
+    // Verificar si tiene inmuebles asociados
+    const inmueblesAsociados=await this.prisma.inmueblePropietario.findMany({
+      where:{propietarioId:id,activo:true},
+    });
+
+    if(inmueblesAsociados.length>0){
+      throw new BadRequestException(
+        'No se puede eliminar el propietario porque tiene inmuebles asociados. Primero elimine las asociaciones.'
+      );
+    }
+
+    return this.prisma.propietario.delete({where:{id}});
   }
 }
