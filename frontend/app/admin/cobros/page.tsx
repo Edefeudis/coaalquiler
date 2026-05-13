@@ -47,7 +47,12 @@ export default function AdminCobrosPage() {
       // Cargar todos los inmuebles con sus cobros del período
       const inmueblesConCobros = [];
       
+      console.log('Iniciando carga de datos para período:', periodoSeleccionado);
+      console.log('Inmuebles disponibles:', inmuebles);
+      
       for (const inmueble of inmuebles) {
+        console.log(`Procesando inmueble ${inmueble.id}: ${inmueble.direccion}`);
+        
         // Cargar cobros del inmueble para el período
         const cobrosRes = await fetch(`http://localhost:3000/api/cobros/inmueble/${inmueble.id}/filtrados?desde=${periodoSeleccionado}-01&hasta=${periodoSeleccionado}-31`, {
           headers: { 
@@ -66,8 +71,13 @@ export default function AdminCobrosPage() {
           const cobrosData = await cobrosRes.json();
           const gastosData = await gastosRes.json();
           
-          const totalCobros = cobrosData.reduce((sum: number, cobro: any) => sum + cobro.montoBruto, 0);
-          const totalGastos = gastosData.reduce((sum: number, gasto: any) => sum + gasto.monto, 0);
+          console.log(`Cobros para inmueble ${inmueble.id}:`, cobrosData);
+          console.log(`Gastos para inmueble ${inmueble.id}:`, gastosData);
+          
+          const totalCobros = cobrosData.reduce((sum: number, cobro: any) => sum + parseFloat(cobro.montoBruto.toString()), 0);
+          const totalGastos = gastosData.reduce((sum: number, gasto: any) => sum + parseFloat(gasto.monto.toString()), 0);
+          
+          console.log(`Totales para inmueble ${inmueble.id}:`, { totalCobros, totalGastos, saldoNeto: totalCobros - totalGastos });
           
           inmueblesConCobros.push({
             inmueble,
@@ -79,15 +89,21 @@ export default function AdminCobrosPage() {
               saldoNeto: totalCobros - totalGastos
             }
           });
+        } else {
+          console.log(`Error cargando datos para inmueble ${inmueble.id}:`, { cobrosOk: cobrosRes.ok, gastosOk: gastosRes.ok });
         }
       }
       
+      console.log('Inmuebles con cobros procesados:', inmueblesConCobros);
+      
       // Calcular resumen general
       const resumenGeneral = {
-        totalCobros: inmueblesConCobros.reduce((sum: number, item: any) => sum + item.totalCobros, 0),
-        totalGastos: inmueblesConCobros.reduce((sum: number, item: any) => sum + item.totalGastos, 0),
-        saldoNeto: inmueblesConCobros.reduce((sum: number, item: any) => sum + item.saldoNeto, 0)
+        totalCobros: inmueblesConCobros.reduce((sum: number, item: any) => sum + item.totales.totalCobros, 0),
+        totalGastos: inmueblesConCobros.reduce((sum: number, item: any) => sum + item.totales.totalGastos, 0),
+        saldoNeto: inmueblesConCobros.reduce((sum: number, item: any) => sum + item.totales.saldoNeto, 0)
       };
+      
+      console.log('Resumen general calculado:', resumenGeneral);
       
       setResumenPeriodo(resumenGeneral);
       setDetalleInmuebles(inmueblesConCobros);
@@ -470,7 +486,7 @@ export default function AdminCobrosPage() {
         )}
 
         {/* Dashboard resumen del período */}
-        {resumenPeriodo && (
+        {detalleInmuebles.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center">
@@ -483,7 +499,11 @@ export default function AdminCobrosPage() {
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Total Cobrado (Período)</dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      {formatCurrency(resumenPeriodo.totalCobros)}
+                      {(() => {
+                        const total = detalleInmuebles.reduce((sum, item) => sum + item.totales.totalCobros, 0);
+                        console.log('Total cobros calculado:', total, 'detalleInmuebles:', detalleInmuebles);
+                        return formatCurrency(total);
+                      })()}
                     </dd>
                   </dl>
                 </div>
@@ -501,7 +521,7 @@ export default function AdminCobrosPage() {
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Total Gastos (Período)</dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      {formatCurrency(resumenPeriodo.totalGastos)}
+                      {formatCurrency(detalleInmuebles.reduce((sum, item) => sum + item.totales.totalGastos, 0))}
                     </dd>
                   </dl>
                 </div>
@@ -512,16 +532,16 @@ export default function AdminCobrosPage() {
               <div className="flex items-center">
                 <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
                   <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                   </svg>
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Saldo Neto (Período)</dt>
                     <dd className={`text-lg font-medium ${
-                      resumenPeriodo.saldoNeto >= 0 ? 'text-green-600' : 'text-red-600'
+                      detalleInmuebles.reduce((sum, item) => sum + item.totales.saldoNeto, 0) >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {formatCurrency(resumenPeriodo.saldoNeto)}
+                      {formatCurrency(detalleInmuebles.reduce((sum, item) => sum + item.totales.saldoNeto, 0))}
                     </dd>
                   </dl>
                 </div>
@@ -532,7 +552,7 @@ export default function AdminCobrosPage() {
               <div className="flex items-center">
                 <div className="flex-shrink-0 bg-yellow-100 rounded-md p-3">
                   <svg className="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3v8m0 0v-1m0 1c-1.11 0-2.08-.402-2.599-1" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div className="ml-5 w-0 flex-1">
@@ -540,9 +560,9 @@ export default function AdminCobrosPage() {
                     <dt className="text-sm font-medium text-gray-500 truncate">Estado del Período</dt>
                     <dd className="text-lg font-medium">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        resumenPeriodo.saldoNeto >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        detalleInmuebles.reduce((sum, item) => sum + item.totales.saldoNeto, 0) >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                       }`}>
-                        {resumenPeriodo.saldoNeto >= 0 ? 'Positivo' : 'Negativo'}
+                        {detalleInmuebles.reduce((sum, item) => sum + item.totales.saldoNeto, 0) >= 0 ? 'Positivo' : 'Negativo'}
                       </span>
                     </dd>
                   </dl>
@@ -698,92 +718,7 @@ export default function AdminCobrosPage() {
         {periodoSeleccionado && (
           <>
 
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Historial de Cobros</h2>
-              {cobros.length === 0 ? (
-                <p className="text-gray-600">No hay cobros registrados para este inmueble</p>
-              ) : (
-              <div className="space-y-4">
-                {cobros.map((cobro) => {
-                  const morosidadStatus = getMorosidadStatus(cobro.periodo);
-                  
-                  return (
-                    <div key={cobro.id} className="border border-gray-200 rounded-md p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            Período: {cobro.periodo}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            Fecha: {new Date(cobro.fechaCobro).toLocaleDateString('es-AR')}
-                          </p>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              morosidadStatus === 'Pagado' 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {morosidadStatus}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xl font-bold text-gray-900">
-                            {formatCurrency(cobro.montoBruto)}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            Neto: {formatCurrency(cobro.montoNeto)}
-                          </div>
-                          {cobro.gastosTotal > 0 && (
-                            <div className="text-sm text-red-600">
-                              Gastos: {formatCurrency(cobro.gastosTotal)}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {cobro.distribuciones && cobro.distribuciones.length > 0 && (
-                        <div className="bg-gray-50 rounded-md p-3">
-                          <div className="flex justify-between items-center mb-2">
-                            <h4 className="text-sm font-semibold text-gray-700">Distribución por propietarios:</h4>
-                            <button
-                              onClick={() => {
-                                const newCollapsed = new Set(collapsedCobros);
-                                if (newCollapsed.has(cobro.id)) {
-                                  newCollapsed.delete(cobro.id);
-                                } else {
-                                  newCollapsed.add(cobro.id);
-                                }
-                                setCollapsedCobros(newCollapsed);
-                              }}
-                              className="text-blue-600 hover:text-blue-700 text-sm"
-                            >
-                              {collapsedCobros.has(cobro.id) ? '▶ Expandir' : '▼ Colapsar'}
-                            </button>
-                          </div>
-                          {!collapsedCobros.has(cobro.id) && (
-                            <div className="space-y-2">
-                              {cobro.distribuciones.map((dist: any) => (
-                                <div key={dist.id} className="flex justify-between items-center text-sm">
-                                  <span className="text-gray-700">
-                                    {dist.propietario.nombre}
-                                  </span>
-                                  <span className="font-semibold text-gray-900">
-                                    {formatCurrency(dist.monto)}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          </>
+                      </>
         )}
       </div>
     </main>
