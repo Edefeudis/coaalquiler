@@ -421,7 +421,7 @@ export class CuentaCorrienteService {
           totalCobrosPropietario,
           totalGastosPropietario,
           totalDistribucionesPropietario,
-          saldoDisponible,
+          saldoFinal,
           detallesPorInmueble
         })
       });
@@ -436,8 +436,7 @@ export class CuentaCorrienteService {
         totalCobrosPropietario,
         totalGastosPropietario,
         totalDistribucionesPropietario,
-        saldoFinal: saldoDisponible,
-        saldoDisponible,
+        saldoFinal,
         detallesPorInmueble
       };
     } catch (error) {
