@@ -1,45 +1,49 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
-import { CuentaCorrienteService } from './cuenta-corriente.service';
+import { DistribucionService } from './distribucion.service';
 
 @Injectable()
 export class CobrosService{
   constructor(
     private readonly prisma:PrismaService,
     private readonly auditoria:AuditoriaService,
-    private readonly cuentaCorrienteService: CuentaCorrienteService,
+    private readonly distribucionService: DistribucionService,
   ){}
 
   async crearCobro(data:{inmuebleId:number;periodo:string;montoBruto:number;fechaCobro?:Date}){
+    console.log('crearCobro llamado con:', data);
+
     const inmueble=await this.prisma.inmueble.findUnique({where:{id:data.inmuebleId}});
     if(!inmueble)throw new NotFoundException(`Inmueble ${data.inmuebleId} no encontrado`);
 
-    // Calcular gastos del período
-    const gastosDelPeriodo = await this.prisma.gastoInmueble.findMany({
-      where: {
-        inmuebleId: data.inmuebleId,
-        fecha: {
-          gte: new Date(data.periodo + '-01'),
-          lt: new Date(data.periodo + '-31')
-        }
-      }
+    // Verificar propietarios activos
+    const propietarios = await this.prisma.inmueblePropietario.findMany({
+      where: { inmuebleId: data.inmuebleId, activo: true },
     });
+    console.log('Propietarios encontrados:', propietarios.length);
+    if (propietarios.length === 0) {
+      throw new BadRequestException('El inmueble no tiene propietarios activos');
+    }
 
-    const gastosTotal = gastosDelPeriodo.reduce((sum, gasto) => sum + parseFloat(gasto.monto.toString()), 0);
+    // Verificar que los porcentajes sumen 100
+    const totalPorcentaje = propietarios.reduce((sum, p) => sum + Number(p.porcentaje), 0);
+    console.log('Total porcentaje:', totalPorcentaje);
+    if (Math.abs(totalPorcentaje - 100) > 0.01) {
+      throw new BadRequestException(`Los porcentajes de propietarios no suman 100%: ${totalPorcentaje}%`);
+    }
 
     const cobro=await this.prisma.cobroAlquiler.create({
       data:{
         inmuebleId:data.inmuebleId,
         periodo:data.periodo,
         montoBruto:data.montoBruto,
-        montoNeto:data.montoBruto - gastosTotal,
-        gastosTotal: gastosTotal,
+        montoNeto: "0",
+        gastosTotal: "0",
         fechaCobro:data.fechaCobro??new Date(),
       },
     });
-
-    const variacion = await this.calcularVariacionPorcentual(data.inmuebleId, data.montoBruto);
+    console.log('Cobro creado:', cobro.id);
 
     await this.auditoria.registrar({
       entidad:'CobroAlquiler',
@@ -48,46 +52,19 @@ export class CobrosService{
       datosNuevos:JSON.stringify(cobro),
     });
 
-    // Integrar con cuenta corriente - distribuir montos a propietarios
-    await this.distribuirMontoCuentaCorriente(cobro);
+    // Distribuir el cobro entre propietarios
+    console.log('Iniciando distribución...');
+    await this.distribucionService.distribuirCobro(cobro.id);
+    console.log('Distribución completada');
 
-    return cobro;
-  }
-
-  async distribuirMontoCuentaCorriente(cobro: any) {
-    try {
-      // Obtener las distribuciones del cobro
-      const distribuciones = await this.prisma.distribucionCobro.findMany({
+    // Retornar el cobro actualizado
+    return {
+      ...cobro,
+      distribuciones: await this.prisma.distribucionCobro.findMany({
         where: { cobroId: cobro.id },
-        include: {
-          propietario: {
-            select: { id: true, nombre: true, email: true }
-          }
-        }
-      });
-
-      // Distribuir el monto neto a cada propietario según su porcentaje
-      for (const distribucion of distribuciones) {
-        const porcentaje = parseFloat(distribucion.porcentaje.toString());
-        const montoDistribucion = (cobro.montoNeto * porcentaje) / 100;
-
-        // Registrar movimiento en cuenta corriente
-        await this.cuentaCorrienteService.registrarMovimiento({
-          propietarioId: distribucion.propietarioId,
-          inmuebleId: cobro.inmuebleId,
-          tipoMovimiento: 'DISTRIBUCION',
-          monto: montoDistribucion,
-          referencia: `Cobro ${cobro.periodo}`,
-          referenciaId: cobro.id,
-          descripcion: `Distribución del cobro del período ${cobro.periodo} - ${porcentaje}%`
-        });
-      }
-
-      console.log(`Distribuido ${cobro.montoNeto} entre ${distribuciones.length} propietarios`);
-    } catch (error) {
-      console.error('Error al distribuir en cuenta corriente:', error);
-      // No lanzar error para no interrumpir el flujo del cobro
-    }
+        include: { propietario: true }
+      })
+    };
   }
 
   async obtenerUltimoCobroPorInmueble(inmuebleId: number) {
@@ -102,25 +79,25 @@ export class CobrosService{
   async obtenerCobrosPorInmueble(inmuebleId:number){
     return this.prisma.cobroAlquiler.findMany({
       where:{inmuebleId},
-      include:{distribuciones:{include:{propietario:{select:{id:true,nombre:true,email:true}}}},factura:true},
+      include:{distribuciones:{include:{propietario:{select:{id:true,nombre:true,email:true}}}},inmueble:true},
       orderBy:{fechaCobro:'desc'},
     });
   }
 
   async obtenerCobrosPorInmuebleConFiltros(inmuebleId:number, desde?:string, hasta?:string){
     const whereClause:any = {inmuebleId};
-    
+
     if (desde) {
       whereClause.fechaCobro = {gte: new Date(desde)};
     }
-    
+
     if (hasta) {
       whereClause.fechaCobro = {...whereClause.fechaCobro, lte: new Date(hasta + 'T23:59:59.999')};
     }
-    
+
     return this.prisma.cobroAlquiler.findMany({
       where: whereClause,
-      include:{distribuciones:{include:{propietario:{select:{id:true,nombre:true,email:true}}}},factura:true,inmueble:true},
+      include:{distribuciones:{include:{propietario:{select:{id:true,nombre:true,email:true}}}},inmueble:true},
       orderBy:{fechaCobro:'desc'},
     });
   }
@@ -218,7 +195,7 @@ export class CobrosService{
   async obtenerCobro(id:number){
     const cobro=await this.prisma.cobroAlquiler.findUnique({
       where:{id},
-      include:{distribuciones:{include:{propietario:true}},factura:true,inmueble:true},
+      include:{distribuciones:{include:{propietario:true}}},
     });
     if(!cobro)throw new NotFoundException(`Cobro ${id} no encontrado`);
     return cobro;

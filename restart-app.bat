@@ -9,21 +9,21 @@ taskkill /F /IM node.exe >nul 2>&1
 timeout /t 2 /nobreak >nul
 
 echo [2/5] Verificando base de datos...
-if not exist "backend\prisma\dev.db" (
-    echo Base de datos no encontrada. Creando...
-    cd backend
-    call npm.cmd run prisma:generate
-    call npm.cmd run prisma:push
-
-    cd ..
-    echo Base de datos creada.
+cd backend
+if not exist "prisma\dev.db" (
+    if not exist "prisma\prisma\dev.db" (
+        echo Base de datos no encontrada. Generando cliente y creando BD...
+        call npm.cmd run prisma:generate
+        call npm.cmd run prisma:push
+        echo Base de datos creada.
+    ) else (
+        echo Base de datos encontrada en prisma\prisma\.
+    )
 ) else (
     echo Base de datos encontrada.
 )
 
 echo [3/5] Verificando datos de seed...
-cd backend
-rem call npm.cmd exec ts-node scripts/seed.ts
 call npm.cmd exec ts-node scripts/seed-admin.ts
 cd ..
 

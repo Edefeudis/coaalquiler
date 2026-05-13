@@ -254,8 +254,7 @@ export default function AdminCobrosPage() {
         body: JSON.stringify({
           inmuebleId: parseInt(formData.inmuebleId),
           periodo: formData.periodo,
-          montoBruto: parseFloat(formData.montoBruto),
-          montoCobrado: parseFloat(formData.montoCobrado),
+          montoBruto: parseFloat(formData.montoCobrado),
           fechaCobro: formData.fechaCobro ? new Date(formData.fechaCobro) : undefined
         })
       });
@@ -686,7 +685,7 @@ export default function AdminCobrosPage() {
                                             {dist.propietario.nombre} ({dist.porcentaje}%):
                                           </span>
                                           <span className="font-medium text-gray-900">
-                                            {formatCurrency(dist.monto)}
+                                            {formatCurrency(Number(dist.montoNeto))}
                                           </span>
                                         </div>
                                       ))}

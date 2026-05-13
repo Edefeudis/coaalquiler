@@ -3,13 +3,15 @@ echo Iniciando Backend y Frontend...
 echo.
 
 echo [1/5] Verificando base de datos...
-if not exist "backend\prisma\dev.db" (
-    echo Base de datos no encontrada. Creando...
-    cd backend
-    call npm.cmd run prisma:generate
-    call npm.cmd run prisma:push
-    cd ..
-    echo Base de datos creada.
+if not exist "prisma\dev.db" (
+    if not exist "prisma\prisma\dev.db" (
+        echo Base de datos no encontrada. Generando cliente y creando BD...
+        call npm.cmd run prisma:generate
+        call npm.cmd run prisma:push
+        echo Base de datos creada.
+    ) else (
+        echo Base de datos encontrada en prisma\prisma\.
+    )
 ) else (
     echo Base de datos encontrada.
 )
