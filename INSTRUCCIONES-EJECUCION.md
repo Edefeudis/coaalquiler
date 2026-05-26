@@ -14,7 +14,7 @@ Inicia tanto el frontend como el backend en ventanas separadas. Es la opción m�
    - Una para el Frontend (Next.js) en puerto 3001
 3. Cierra la ventana principal del script cuando desees
 
-### 🚀 `start-app.bat`
+### � `start-app.bat`
 Inicia tanto el frontend como el backend en ventanas separadas con mensajes detallados.
 
 **Uso:**

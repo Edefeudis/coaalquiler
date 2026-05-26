@@ -559,19 +559,26 @@ export default function AdminCuentaCorrientePage() {
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Seleccionar Propietario</h2>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Propietario</label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Propietario</label>
             <select
               value={selectedPropietario || ''}
               onChange={e => handlePropietarioChange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
             >
               <option value="">Seleccionar propietario</option>
               {propietarios.map((propietario) => (
-                <option key={propietario.id} value={propietario.id}>
+                <option key={propietario.id} value={propietario.id} className="font-semibold text-black">
                   {propietario.nombre} ({propietario.email})
                 </option>
               ))}
             </select>
+            {selectedPropietario && propietarios.find(p => p.id === selectedPropietario) && (
+              <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-md">
+                <p className="text-sm font-semibold text-black">
+                  Propietario seleccionado: {propietarios.find(p => p.id === selectedPropietario)?.nombre}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -582,7 +589,7 @@ export default function AdminCuentaCorrientePage() {
             <form onSubmit={handleDistribucionSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Propietario</label>
+                  <label className="block text-sm font-medium text-black mb-1">Propietario</label>
                   <select
                     value={distribucionForm.propietarioId}
                     onChange={async e => {
@@ -595,25 +602,25 @@ export default function AdminCuentaCorrientePage() {
                       }
                     }}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                   >
                     <option value="">Seleccionar propietario</option>
                     {propietarios.map((propietario) => (
-                      <option key={propietario.id} value={propietario.id}>
+                      <option key={propietario.id} value={propietario.id} className="text-black">
                         {propietario.nombre}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Monto a distribuir ($)</label>
+                  <label className="block text-sm font-medium text-black mb-1">Monto a distribuir ($)</label>
                   <input
                     type="number"
                     step="0.01"
                     value={distribucionForm.monto}
                     onChange={e => setDistribucionForm({...distribucionForm, monto: e.target.value})}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                   />
                   {distribucionForm.propietarioId && (
                     <p className="text-xs text-gray-500 mt-1">
@@ -623,13 +630,13 @@ export default function AdminCuentaCorrientePage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                <label className="block text-sm font-medium text-black mb-1">Descripción</label>
                 <input
                   type="text"
                   value={distribucionForm.descripcion}
                   onChange={e => setDistribucionForm({...distribucionForm, descripcion: e.target.value})}
                   placeholder="Descripción de la distribución"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                 />
               </div>
               <button
@@ -650,7 +657,7 @@ export default function AdminCuentaCorrientePage() {
             <form onSubmit={handleAjusteSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Propietario</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Propietario</label>
                   <select
                     value={ajusteForm.propietarioId}
                     onChange={e => setAjusteForm({...ajusteForm, propietarioId: e.target.value})}
@@ -666,7 +673,7 @@ export default function AdminCuentaCorrientePage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Tipo</label>
                   <select
                     value={ajusteForm.tipo}
                     onChange={e => setAjusteForm({...ajusteForm, tipo: e.target.value as 'POSITIVO' | 'NEGATIVO'})}
@@ -679,7 +686,7 @@ export default function AdminCuentaCorrientePage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Monto ($)</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Monto ($)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -690,7 +697,7 @@ export default function AdminCuentaCorrientePage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Descripción</label>
                   <input
                     type="text"
                     value={ajusteForm.descripcion}
