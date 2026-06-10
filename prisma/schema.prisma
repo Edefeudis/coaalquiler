@@ -27,6 +27,20 @@ model Propietario {
   cuentaCorriente CuentaCorriente[]
 }
 
+model Usuario {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  nombre    String
+  rol       String   // ADMIN, EMPLEADO
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([rol])
+}
+
 model InmueblePropietario {
   inmuebleId    Int
   propietarioId Int
@@ -80,13 +94,15 @@ model CobroAlquiler {
 }
 
 model DistribucionCobro {
-  id              Int     @id @default(autoincrement())
+  id              Int       @id @default(autoincrement())
   cobroId         Int
   propietarioId   Int
   montoAsignado   Decimal
   porcentaje      Decimal
-  gastosDeducidos Decimal @default(0)
+  gastosDeducidos Decimal   @default(0)
   montoNeto       Decimal
+  descripcion     String?
+  createdAt       DateTime  @default(now())
 
   cobro       CobroAlquiler @relation(fields: [cobroId], references: [id], onDelete: Cascade)
   propietario Propietario   @relation(fields: [propietarioId], references: [id], onDelete: Cascade)
@@ -134,7 +150,7 @@ model CuentaCorriente {
   id              Int      @id @default(autoincrement())
   propietarioId   Int
   inmuebleId      Int?
-  tipoMovimiento  String   // CREDITO, DEBITO, DISTRIBUCION, GASTO, AJUSTE
+  tipoMovimiento  String   // CREDITO, DEBITO, DISTRIBUCION, GASTO, AJUSTE, AJUSTE_POSITIVO, AJUSTE_NEGATIVO
   monto           Decimal
   saldoAnterior   Decimal  @default(0)
   saldoNuevo      Decimal

@@ -1,0 +1,39 @@
+-- ==========================================================
+-- BACKUP REGISTROS ELIMINADOS - 10/06/2026
+-- Movimientos de asignación de alquiler eliminados para:
+--   Eduardo De Feudis (id=1), Marcelo De Feudis (id=3), Ana Novelli (id=4)
+-- ==========================================================
+
+-- 1. DEBITOS de CuentaCorriente eliminados
+-- (8 registros)
+INSERT INTO CuentaCorriente (id, propietarioId, inmuebleId, tipoMovimiento, monto, saldoAnterior, saldoNuevo, referencia, referenciaId, descripcion, fecha, createdAt)
+VALUES
+(3, 4, NULL, 'DEBITO', 418233.144836, 418233.144836, 0, NULL, NULL, 'retiro mayo', '2026-05-13T22:39:00.034Z', '2026-05-13T22:39:00.034Z'),
+(4, 1, NULL, 'DEBITO', 418220.9240819999, 418220.9240819999, 0, NULL, NULL, 'retiro Mayo', '2026-05-13T23:22:10.463Z', '2026-05-13T23:22:10.463Z'),
+(5, 3, NULL, 'DEBITO', 286000, 418223.471082, 132223.471082, NULL, NULL, 'retiro parcial mayo', '2026-05-13T23:24:17.641Z', '2026-05-13T23:24:17.641Z'),
+(6, 3, NULL, 'DEBITO', 130000, 132223.471082, 2223.471082000004, NULL, NULL, '2da cuota mayo', '2026-05-26T15:48:50.967Z', '2026-05-26T15:48:50.967Z'),
+(7, 3, NULL, 'DEBITO', 920, 2223.471082000004, 1303.471082000004, NULL, NULL, 'fin distribucion', '2026-05-26T16:14:41.027Z', '2026-05-26T16:14:41.027Z'),
+(8, 1, NULL, 'DEBITO', 254506.1441820001, 254506.1441820001, 0, NULL, NULL, '1er distribucion', '2026-06-10T22:18:44.366Z', '2026-06-10T22:18:44.366Z'),
+(9, 3, NULL, 'DEBITO', 255772.8682639999, 255772.8682639999, 0, NULL, NULL, '1er distribucin', '2026-06-10T22:19:14.325Z', '2026-06-10T22:19:14.325Z'),
+(10, 4, NULL, 'DEBITO', 254508.998636, 254508.998636, 0, NULL, NULL, '1er distribucion', '2026-06-10T22:19:56.975Z', '2026-06-10T22:19:56.975Z');
+
+-- 2. DistribucionCobro eliminadas
+-- (11 registros)
+INSERT INTO DistribucionCobro (id, cobroId, propietarioId, montoAsignado, porcentaje, gastosDeducidos, montoNeto, descripcion, createdAt)
+VALUES
+(1, 4, 1, 123024.6, 33.34, 0, 123024.6, NULL, '2026-05-13T22:03:00.000Z'),
+(2, 4, 3, 122987.7, 33.33, 0, 122987.7, NULL, '2026-05-13T22:03:00.000Z'),
+(3, 5, 1, 122514.5, 33.34, 0, 122514.5, NULL, '2026-06-10T22:14:44.366Z'),
+(4, 5, 3, 122477.75, 33.33, 0, 122477.75, NULL, '2026-06-10T22:14:44.366Z'),
+(5, 5, 4, 122477.75, 33.33, 0, 122477.75, NULL, '2026-06-10T22:14:44.366Z'),
+(6, 6, 1, 136255.37, 33.33, 0, 136255.37, NULL, '2026-06-10T22:15:44.159Z'),
+(7, 6, 3, 136255.37, 33.33, 0, 136255.37, NULL, '2026-06-10T22:15:44.159Z'),
+(8, 6, 4, 136296.26, 33.34, 0, 136296.25, NULL, '2026-06-10T22:15:44.159Z'),
+(9, 7, 1, 44995.5, 33.33, 26297.37, 18698.13, NULL, '2026-06-10T22:26:00.993Z'),
+(10, 7, 3, 44995.5, 33.33, 26297.37, 18698.13, NULL, '2026-06-10T22:26:00.993Z'),
+(11, 7, 4, 45009, 33.34, 26305.26, 18703.74, NULL, '2026-06-10T22:26:00.993Z');
+
+-- 3. CobroAlquiler actualizados a PENDIENTE
+-- (IDs 4, 5, 6, 7 - estaban en estado DISTRIBUIDO)
+UPDATE CobroAlquiler SET estado = 'DISTRIBUIDO' WHERE id IN (4, 5, 6, 7);
+-- Para restaurar: UPDATE CobroAlquiler SET estado = 'DISTRIBUIDO' WHERE id IN (4, 5, 6, 7);

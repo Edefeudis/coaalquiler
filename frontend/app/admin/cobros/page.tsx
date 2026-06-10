@@ -395,15 +395,15 @@ export default function AdminCobrosPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b border-gray-200">
+    <main className="min-h-screen bg-blue-50">
+      <nav className="bg-white shadow-sm border-b border-blue-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center space-x-4">
               <a href="/admin/dashboard" className="text-blue-600 hover:text-blue-700">
                 ← Dashboard
               </a>
-              <h1 className="text-xl font-bold text-gray-900">Reporte por Período</h1>
+              <h1 className="text-xl font-bold text-blue-900">Reporte por Período</h1>
             </div>
             <div className="flex space-x-2">
               {resumenPeriodo && (
@@ -428,19 +428,19 @@ export default function AdminCobrosPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Selector de período - principal */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Seleccionar Período</h2>
+          <h2 className="text-xl font-bold text-blue-900 mb-4">Seleccionar Período</h2>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Mes y Año</label>
+            <label className="block text-sm font-medium text-blue-800 mb-1">Mes y Año</label>
             <input
               type="month"
               value={periodoSeleccionado}
               onChange={e => setPeriodoSeleccionado(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           {periodoSeleccionado && (
             <div className="mt-4 p-4 bg-blue-50 rounded-md">
-              <p className="text-sm text-blue-800">
+              <p className="text-sm text-indigo-800">
                 Mostrando datos del período: <strong>{(() => {
   const [year, month] = periodoSeleccionado.split('-');
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -454,16 +454,16 @@ export default function AdminCobrosPage() {
         {/* Formulario de nuevo cobro - ahora en la parte superior */}
         {showForm && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Cargar Cobro de Alquiler</h2>
+            <h2 className="text-xl font-bold text-blue-900 mb-4">Cargar Cobro de Alquiler</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Inmueble</label>
+                  <label className="block text-sm font-medium text-blue-800 mb-1">Inmueble</label>
                   <select
                     value={formData.inmuebleId}
                     onChange={e => setFormData({...formData, inmuebleId: e.target.value})}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Seleccionar inmueble</option>
                     {inmuebles.map((inmueble) => (
@@ -474,34 +474,34 @@ export default function AdminCobrosPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Período (Mes/Año)</label>
+                  <label className="block text-sm font-medium text-blue-800 mb-1">Período (Mes/Año)</label>
                   <input
                     type="month"
                     value={formData.periodo}
                     onChange={e => setFormData({...formData, periodo: e.target.value})}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Cobro</label>
+                  <label className="block text-sm font-medium text-blue-800 mb-1">Fecha de Cobro</label>
                   <input
                     type="date"
                     value={formData.fechaCobro}
                     onChange={e => setFormData({...formData, fechaCobro: e.target.value})}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Importe Cobrado</label>
+                  <label className="block text-sm font-medium text-blue-800 mb-1">Importe Cobrado</label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.montoCobrado}
                     onChange={e => setFormData({...formData, montoCobrado: e.target.value})}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -510,7 +510,7 @@ export default function AdminCobrosPage() {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
                   Cancelar
                 </button>
@@ -538,8 +538,8 @@ export default function AdminCobrosPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Cobrado (Período)</dt>
-                    <dd className="text-lg font-medium text-gray-900">
+                    <dt className="text-sm font-medium text-blue-600 truncate">Total Cobrado (Período)</dt>
+                    <dd className="text-lg font-medium text-blue-900">
                       {(() => {
                         const total = detalleInmuebles.reduce((sum, item) => sum + item.totales.totalCobros, 0);
                         console.log('Total cobros calculado:', total, 'detalleInmuebles:', detalleInmuebles);
@@ -560,8 +560,8 @@ export default function AdminCobrosPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Gastos (Período)</dt>
-                    <dd className="text-lg font-medium text-gray-900">
+                    <dt className="text-sm font-medium text-blue-600 truncate">Total Gastos (Período)</dt>
+                    <dd className="text-lg font-medium text-blue-900">
                       {formatCurrency(detalleInmuebles.reduce((sum, item) => sum + item.totales.totalGastos, 0))}
                     </dd>
                   </dl>
@@ -578,7 +578,7 @@ export default function AdminCobrosPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Saldo Neto (Período)</dt>
+                    <dt className="text-sm font-medium text-blue-600 truncate">Saldo Neto (Período)</dt>
                     <dd className={`text-lg font-medium ${
                       detalleInmuebles.reduce((sum, item) => sum + item.totales.saldoNeto, 0) >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
@@ -598,7 +598,7 @@ export default function AdminCobrosPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Estado del Período</dt>
+                    <dt className="text-sm font-medium text-blue-600 truncate">Estado del Período</dt>
                     <dd className="text-lg font-medium">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         detalleInmuebles.reduce((sum, item) => sum + item.totales.saldoNeto, 0) >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
@@ -616,30 +616,30 @@ export default function AdminCobrosPage() {
         {/* Detalle de inmuebles del período */}
         {detalleInmuebles.length > 0 && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Detalle por Inmueble</h2>
+            <h2 className="text-2xl font-bold text-blue-900 mb-6">Detalle por Inmueble</h2>
             {detalleInmuebles.map((detalle, index) => (
               <div key={detalle.inmueble.id} className="bg-white rounded-lg shadow-md p-6">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-gray-900">
+                  <h3 className="text-xl font-bold text-blue-900">
                     {detalle.inmueble.direccion}
                   </h3>
                   <div className="text-right">
                     <div className="text-lg font-bold text-blue-600">
                       {formatCurrency(detalle.totales.saldoNeto)}
                     </div>
-                    <div className="text-sm text-gray-600">Saldo Neto</div>
+                    <div className="text-sm text-blue-700">Saldo Neto</div>
                   </div>
                 </div>
 
                 {/* Tabs para cobros y gastos */}
-                <div className="border-b border-gray-200">
+                <div className="border-b border-blue-200">
                   <nav className="-mb-px flex space-x-8">
                     <button
                       onClick={() => setActiveTab('cobros')}
                       className={`py-2 px-1 border-b-2 font-medium text-sm ${
                         activeTab === 'cobros'
                           ? 'border-blue-500 text-blue-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                          : 'border-transparent text-blue-600 hover:text-blue-800 hover:border-blue-300'
                       }`}
                     >
                       Cobros ({detalle.cobros.length})
@@ -649,7 +649,7 @@ export default function AdminCobrosPage() {
                       className={`py-2 px-1 border-b-2 font-medium text-sm ${
                         activeTab === 'gastos'
                           ? 'border-blue-500 text-blue-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                          : 'border-transparent text-blue-600 hover:text-blue-800 hover:border-blue-300'
                       }`}
                     >
                       Gastos ({detalle.gastos.length})
@@ -660,31 +660,31 @@ export default function AdminCobrosPage() {
                 {/* Lista de cobros */}
                 {activeTab === 'cobros' && (
                   <div className="mt-6">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Cobros del Período</h4>
+                    <h4 className="text-lg font-semibold text-blue-900 mb-4">Cobros del Período</h4>
                     {detalle.cobros.length === 0 ? (
-                      <p className="text-gray-600">No hay cobros registrados para este inmueble en el período</p>
+                      <p className="text-blue-700">No hay cobros registrados para este inmueble en el período</p>
                     ) : (
                       <div className="space-y-3">
                         {detalle.cobros.map((cobro: any) => (
-                          <div key={cobro.id} className="border border-gray-200 rounded-md p-4">
+                          <div key={cobro.id} className="border border-blue-200 rounded-md p-4">
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
-                                <div className="font-medium text-gray-900">
+                                <div className="font-medium text-blue-900">
                                   Período: {cobro.periodo}
                                 </div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-blue-700">
                                   Fecha: {new Date(cobro.fechaCobro).toLocaleDateString('es-AR')}
                                 </div>
                                 {cobro.distribuciones && cobro.distribuciones.length > 0 && (
                                   <div className="mt-2">
-                                    <div className="text-sm font-medium text-gray-700">Distribución:</div>
+                                    <div className="text-sm font-medium text-blue-800">Distribución:</div>
                                     <div className="space-y-1">
                                       {cobro.distribuciones.map((dist: any) => (
                                         <div key={dist.id} className="flex justify-between text-sm">
-                                          <span className="text-gray-600">
+                                          <span className="text-blue-700">
                                             {dist.propietario.nombre} ({dist.porcentaje}%):
                                           </span>
-                                          <span className="font-medium text-gray-900">
+                                          <span className="font-medium text-blue-900">
                                             {formatCurrency(Number(dist.montoNeto))}
                                           </span>
                                         </div>
@@ -694,10 +694,10 @@ export default function AdminCobrosPage() {
                                 )}
                               </div>
                               <div className="text-right">
-                                <div className="text-lg font-bold text-gray-900">
+                                <div className="text-lg font-bold text-blue-900">
                                   {formatCurrency(cobro.montoBruto)}
                                 </div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-blue-700">
                                   Neto: {formatCurrency(cobro.montoNeto)}
                                 </div>
                                 {cobro.gastosTotal > 0 && (
@@ -717,23 +717,23 @@ export default function AdminCobrosPage() {
                 {/* Lista de gastos */}
                 {activeTab === 'gastos' && (
                   <div className="mt-6">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Gastos del Período</h4>
+                    <h4 className="text-lg font-semibold text-blue-900 mb-4">Gastos del Período</h4>
                     {detalle.gastos.length === 0 ? (
-                      <p className="text-gray-600">No hay gastos registrados para este inmueble en el período</p>
+                      <p className="text-blue-700">No hay gastos registrados para este inmueble en el período</p>
                     ) : (
                       <div className="space-y-3">
                         {detalle.gastos.map((gasto: any) => (
-                          <div key={gasto.id} className="border border-gray-200 rounded-md p-4">
+                          <div key={gasto.id} className="border border-blue-200 rounded-md p-4">
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
-                                <div className="font-medium text-gray-900">
+                                <div className="font-medium text-blue-900">
                                   {gasto.concepto}
                                 </div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-blue-700">
                                   Fecha: {new Date(gasto.fecha).toLocaleDateString('es-AR')}
                                 </div>
                                 {gasto.descripcion && (
-                                  <div className="text-sm text-gray-500 mt-1">
+                                  <div className="text-sm text-blue-600 mt-1">
                                     {gasto.descripcion}
                                   </div>
                                 )}

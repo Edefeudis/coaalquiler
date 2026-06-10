@@ -13,6 +13,7 @@ model Inmueble {
   propietarios InmueblePropietario[]
   gastos       GastoInmueble[]
   cobros       CobroAlquiler[]
+  cuentaCorriente CuentaCorriente[]
 
   // campos existentes se mantienen sin modificaciones
 }
@@ -23,6 +24,7 @@ model Propietario {
   email          String                @unique
   inmuebles      InmueblePropietario[]
   distribuciones DistribucionCobro[]
+  cuentaCorriente CuentaCorriente[]
 }
 
 model Usuario {
@@ -111,21 +113,25 @@ model DistribucionCobro {
 }
 
 model CuentaCorriente {
-  id              Int       @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   propietarioId   Int
   inmuebleId      Int?
-  tipoMovimiento String    // CREDITO, DEBITO, GASTO, DISTRIBUCION, AJUSTE_POSITIVO, AJUSTE_NEGATIVO
+  tipoMovimiento  String   // CREDITO, DEBITO, DISTRIBUCION, GASTO, AJUSTE, AJUSTE_POSITIVO, AJUSTE_NEGATIVO
   monto           Decimal
-  saldoAnterior   Decimal
+  saldoAnterior   Decimal  @default(0)
   saldoNuevo      Decimal
-  referencia      String?
-  referenciaId    Int?
+  referencia      String?  // referencia al cobro, gasto, o distribución
+  referenciaId    Int?     // ID de la entidad de referencia
   descripcion     String?
-  fecha           DateTime  @default(now())
-  createdAt       DateTime  @default(now())
+  fecha           DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  propietario Propietario @relation(fields: [propietarioId], references: [id], onDelete: Cascade)
+  inmueble   Inmueble?   @relation(fields: [inmuebleId], references: [id], onDelete: Cascade)
 
   @@index([propietarioId])
   @@index([inmuebleId])
+  @@index([tipoMovimiento])
   @@index([fecha])
 }
 

@@ -167,44 +167,6 @@ export class CuentaCorrienteService {
       });
     }
 
-    // Obtener distribuciones de alquiler (asignación proporcional automática al cobrar)
-    const distribuciones = await this.prisma.distribucionCobro.findMany({
-      where: {
-        propietarioId
-      },
-      include: {
-        propietario: {
-          select: { id: true, nombre: true, email: true }
-        },
-        cobro: {
-          include: {
-            inmueble: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    for (const d of distribuciones) {
-      const ip = inmueblePropietarios.find(i => i.inmuebleId === d.cobro.inmuebleId);
-      if (!ip) continue;
-
-      movimientos.push({
-        id: d.id + 20000,
-        fecha: d.createdAt,
-        tipoMovimiento: 'CREDITO',
-        descripcion: `Asignación de alquiler - Período ${d.cobro.periodo}`,
-        monto: parseFloat(d.montoNeto.toString()),
-        referencia: `Cobro ${d.id}`,
-        referenciaId: d.id,
-        saldoNuevo: 0,
-        inmueble: d.cobro.inmueble,
-        propietario: d.propietario
-      });
-    }
-
     // Obtener retiros/distribuciones reales desde CuentaCorriente (DEBITO)
     const retiros = await this.prisma.cuentaCorriente.findMany({
       where: {
