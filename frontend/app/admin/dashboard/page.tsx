@@ -142,6 +142,17 @@ export default function AdminDashboardPage() {
               Ver →
             </a>
           </div>
+
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Usuarios</h3>
+            <p className="text-gray-600 mb-4">Administración de usuarios del sistema</p>
+            <a
+              href="/admin/usuarios"
+              className="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Gestionar →
+            </a>
+          </div>
         </div>
       </div>
     </main>
