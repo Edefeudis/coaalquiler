@@ -17,26 +17,26 @@ if not exist "prisma\dev.db" (
 ) else (
     echo Base de datos encontrada.
 )
-echo [2/5] Verificando datos de seed...
+echo [2/6] Creando backup de la base de datos...
+cd backend
+call npm.cmd exec ts-node scripts/backup-db.ts
+cd ..
+
+echo [3/6] Verificando datos de seed...
 cd backend
 rem call npm.cmd exec ts-node scripts/seed.ts
 call npm.cmd exec ts-node scripts/seed-admin.ts
 cd ..
 
-echo [3/5] Iniciando Backend (NestJS) en puerto 3000...
+echo [4/6] Iniciando Backend (NestJS) en puerto 3000...
 start "Backend - NestJS (Puerto 3000)" cmd /c "cd backend && npm.cmd start"
 
 timeout /t 3 /nobreak >nul
 
-echo [4/5] Iniciando Frontend (Next.js) en puerto 3001...
+echo [5/6] Iniciando Frontend (Next.js) en puerto 3001...
 start "Frontend - Next.js (Puerto 3001)" cmd /c "cd frontend && npm.cmd run dev"
 
-echo [5/5] Esperando que los servidores inicien...
-timeout /t 5 /nobreak >nul
-
-echo.
-echo ====================================
-echo Aplicacion iniciada!
+echo [6/6] Esperando que los servidores inicien...
 echo ====================================
 echo Backend:  http://localhost:3000
 echo Frontend: http://localhost:3001

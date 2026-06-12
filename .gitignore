@@ -43,6 +43,9 @@ coverage/
 prisma/dev.db
 prisma/*.db
 
+# Backups
+backups/
+
 # Cache
 .cache/
 .parcel-cache/
