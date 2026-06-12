@@ -36,10 +36,12 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full mx-4 p-8 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold text-center mb-6">Panel de Administración</h1>
-        <p className="text-center text-gray-600 mb-6">Ingreso para administradores y empleados</p>
+    <main className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
+      <div className="max-w-md w-full mx-4 p-8 bg-white rounded-lg shadow-md border border-teal-100">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-teal-700">Panel de Administración</h1>
+          <p className="text-teal-500 mt-2">Ingreso para administradores y empleados</p>
+        </div>
         
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
@@ -49,7 +51,7 @@ export default function AdminLoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium text-teal-600 mb-1">
               Email
             </label>
             <input
@@ -58,11 +60,11 @@ export default function AdminLoginPage() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-teal-200 rounded-md focus:outline-none focus:ring-2 focus:ring-copper-400"
             />
           </div>
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-teal-600 mb-1">
               Contraseña
             </label>
             <input
@@ -71,20 +73,20 @@ export default function AdminLoginPage() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-teal-200 rounded-md focus:outline-none focus:ring-2 focus:ring-copper-400"
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-copper-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <a href="/" className="text-blue-600 hover:text-blue-700 text-sm">
+          <a href="/" className="text-teal-500 hover:text-teal-600 text-sm transition-colors">
             ← Volver al login de propietarios
           </a>
         </div>

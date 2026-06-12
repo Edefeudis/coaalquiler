@@ -10,75 +10,53 @@ export class CuentaCorrienteService {
   ) {}
 
   async obtenerSaldoActual(propietarioId: number, inmuebleId?: number) {
-    // Obtener los inmuebles del propietario
+    // Calcular: CREDITOS (CobroAlquiler montoBruto × %) - GASTOS (GastoInmueble × %) - DEBITOS (CtaCte)
+    // NO se suma DISTRIBUCION porque ya está incluida en los CREDITOS de CobroAlquiler
+
     const inmueblePropietarios = await this.prisma.inmueblePropietario.findMany({
       where: { propietarioId, activo: true },
       include: { inmueble: true }
     });
 
     const idsInmuebles = inmueblePropietarios.map(ip => ip.inmuebleId);
-    if (inmuebleId && !idsInmuebles.includes(inmuebleId)) {
-      return 0;
-    }
-
+    if (inmuebleId && !idsInmuebles.includes(inmuebleId)) return 0;
     const idsFiltrados = inmuebleId ? [inmuebleId] : idsInmuebles;
+    if (idsFiltrados.length === 0) return 0;
 
-    if (idsFiltrados.length === 0) {
-      return 0;
-    }
+    let saldo = 0;
 
-    // Obtener cobros de los inmuebles (créditos)
-    const cobros = await this.prisma.cobroAlquiler.findMany({
-      where: {
-        inmuebleId: { in: idsFiltrados }
-      }
-    });
-
-    // Obtener gastos de los inmuebles (débitos)
-    const gastos = await this.prisma.gastoInmueble.findMany({
-      where: {
-        inmuebleId: { in: idsFiltrados }
-      }
-    });
-
-    // Obtener retiros manuales (DEBITO) desde CuentaCorriente
-    const retiros = await this.prisma.cuentaCorriente.findMany({
-      where: {
-        propietarioId,
-        tipoMovimiento: { in: ['DEBITO', 'DISTRIBUCION'] }
-      }
-    });
-
-    // Calcular saldo: cobros por porcentaje - gastos por porcentaje - retiros
-    let saldoTotal = 0;
+    // Sumar CREDITOS (cobros × % del propietario)
     for (const ip of inmueblePropietarios) {
       if (!idsFiltrados.includes(ip.inmuebleId)) continue;
+      const pct = parseFloat(ip.porcentaje.toString()) / 100;
 
-      const porcentaje = parseFloat(ip.porcentaje.toString()) / 100;
+      const cobros = await this.prisma.cobroAlquiler.findMany({ where: { inmuebleId: ip.inmuebleId } });
+      const totalCobros = cobros.reduce((sum, c) => sum + parseFloat(c.montoBruto.toString()), 0) * pct;
+      saldo += totalCobros;
 
-      // Cobros del inmueble
-      const cobrosInmueble = cobros
-        .filter(c => c.inmuebleId === ip.inmuebleId)
-        .reduce((sum, c) => sum + parseFloat(c.montoNeto.toString()), 0);
-
-      // Gastos del inmueble
-      const gastosInmueble = gastos
-        .filter(g => g.inmuebleId === ip.inmuebleId)
-        .reduce((sum, g) => sum + parseFloat(g.monto.toString()), 0);
-
-      const cobrosPropietario = cobrosInmueble * porcentaje;
-      const gastosPropietario = gastosInmueble * porcentaje;
-
-      saldoTotal += cobrosPropietario - gastosPropietario;
+      const gastos = await this.prisma.gastoInmueble.findMany({ where: { inmuebleId: ip.inmuebleId } });
+      const totalGastos = gastos.reduce((sum, g) => sum + parseFloat(g.monto.toString()), 0) * pct;
+      saldo -= totalGastos;
     }
 
-    // Restar los retiros manuales (DEBITO) de CuentaCorriente
-    const totalRetiros = retiros.reduce(
-      (sum, r) => sum + parseFloat(r.monto.toString()), 0
-    );
-    saldoTotal -= totalRetiros;
+    // Restar DEBITOS de CuentaCorriente
+    const debitos = await this.prisma.cuentaCorriente.findMany({
+      where: { propietarioId, tipoMovimiento: 'DEBITO' }
+    });
+    for (const d of debitos) {
+      saldo -= parseFloat(d.monto.toString());
+    }
 
-    return saldoTotal;
+    // Sumar AJUSTES
+    const ajustes = await this.prisma.cuentaCorriente.findMany({
+      where: { propietarioId, tipoMovimiento: { in: ['AJUSTE_POSITIVO', 'AJUSTE_NEGATIVO'] } }
+    });
+    for (const a of ajustes) {
+      if (a.tipoMovimiento === 'AJUSTE_POSITIVO') saldo += parseFloat(a.monto.toString());
+      else saldo -= parseFloat(a.monto.toString());
+    }
+
+    return saldo;
   }
 
   async obtenerMovimientosPorPropietario(propietarioId: number, inmuebleId?: number) {
@@ -119,13 +97,13 @@ export class CuentaCorrienteService {
       if (!ip) continue;
 
       const pct = parseFloat(ip.porcentaje.toString()) / 100;
-      const montoPropietario = parseFloat(c.montoNeto.toString()) * pct;
+      const montoPropietario = parseFloat(c.montoBruto.toString()) * pct;
 
       movimientos.push({
         id: c.id,
         fecha: c.fechaCobro,
         tipoMovimiento: 'CREDITO',
-        descripcion: `Cobro alquiler - Período ${c.periodo}`,
+        descripcion: `Cobro alquiler ${c.inmueble.direccion} - Período ${c.periodo}`,
         monto: montoPropietario,
         referencia: `Cobro ${c.id}`,
         referenciaId: c.id,
@@ -155,7 +133,7 @@ export class CuentaCorrienteService {
       const montoPropietario = parseFloat(g.monto.toString()) * pct;
 
       movimientos.push({
-        id: g.id + 10000, // Evitar conflicto de IDs
+        id: g.id + 10000,
         fecha: g.fecha,
         tipoMovimiento: 'GASTO',
         descripcion: g.concepto,
@@ -167,26 +145,21 @@ export class CuentaCorrienteService {
       });
     }
 
-    // Obtener retiros/distribuciones reales desde CuentaCorriente (DEBITO)
-    const retiros = await this.prisma.cuentaCorriente.findMany({
-      where: {
-        propietarioId,
-        tipoMovimiento: { in: ['DEBITO', 'DISTRIBUCION'] }
-      },
-      orderBy: {
-        fecha: 'desc'
-      }
+    // Obtener DEBITOS desde CuentaCorriente (retiros/pagos)
+    const debitos = await this.prisma.cuentaCorriente.findMany({
+      where: { propietarioId, tipoMovimiento: 'DEBITO' },
+      orderBy: { fecha: 'desc' }
     });
 
-    for (const r of retiros) {
+    for (const d of debitos) {
       movimientos.push({
-        id: r.id + 30000,
-        fecha: r.fecha,
+        id: d.id + 30000,
+        fecha: d.fecha,
         tipoMovimiento: 'DEBITO',
-        descripcion: r.descripcion || 'Retiro de fondos',
-        monto: parseFloat(r.monto.toString()),
-        referencia: r.referencia || `Retiro ${r.id}`,
-        referenciaId: r.id,
+        descripcion: d.descripcion || 'Retiro de fondos',
+        monto: parseFloat(d.monto.toString()),
+        referencia: d.referencia || `Retiro ${d.id}`,
+        referenciaId: d.id,
         saldoNuevo: 0,
         inmueble: null
       });
@@ -194,13 +167,8 @@ export class CuentaCorrienteService {
 
     // Obtener ajustes desde CuentaCorriente
     const ajustes = await this.prisma.cuentaCorriente.findMany({
-      where: {
-        propietarioId,
-        tipoMovimiento: { in: ['AJUSTE_POSITIVO', 'AJUSTE_NEGATIVO'] }
-      },
-      orderBy: {
-        fecha: 'desc'
-      }
+      where: { propietarioId, tipoMovimiento: { in: ['AJUSTE_POSITIVO', 'AJUSTE_NEGATIVO'] } },
+      orderBy: { fecha: 'desc' }
     });
 
     for (const a of ajustes) {
@@ -217,18 +185,28 @@ export class CuentaCorrienteService {
       });
     }
 
-    // Ordenar por fecha descendente
+    // Calcular saldo total desde el más viejo (CREDITO suma, GASTO/DEBITO/AJUSTE_NEGATIVO restan)
+    let saldoTotal = 0;
+    for (const mov of [...movimientos].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())) {
+      if (mov.tipoMovimiento === 'CREDITO' || mov.tipoMovimiento === 'AJUSTE_POSITIVO') {
+        saldoTotal += mov.monto;
+      } else {
+        saldoTotal -= mov.monto;
+      }
+    }
+
+    // Orden descendente para mostrar
     movimientos.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
-    // Calcular saldo running
-    let saldo = 0;
+    // Asignar saldoNuevo retrocediendo
+    let saldoCorriente = saldoTotal;
     for (const mov of movimientos) {
-      if (mov.tipoMovimiento === 'CREDITO' || mov.tipoMovimiento === 'DISTRIBUCION' || mov.tipoMovimiento === 'AJUSTE_POSITIVO') {
-        saldo += mov.monto;
+      mov.saldoNuevo = saldoCorriente;
+      if (mov.tipoMovimiento === 'CREDITO' || mov.tipoMovimiento === 'AJUSTE_POSITIVO') {
+        saldoCorriente -= mov.monto;
       } else {
-        saldo -= mov.monto;
+        saldoCorriente += mov.monto;
       }
-      mov.saldoNuevo = saldo;
     }
 
     return movimientos;
@@ -352,37 +330,30 @@ export class CuentaCorrienteService {
       include: { inmueble: true }
     });
 
-    // Calcular saldos por inmueble
+    // Mostrar el monto distribuido en el ÚLTIMO MES de cada propiedad
+    // Si no hay cobros registrados aún, mostrar 0
     const saldosPorInmueble = [];
     for (const ip of inmueblePropietarios) {
-      const distribuciones = await this.prisma.distribucionCobro.findMany({
-        where: {
-          propietarioId,
-          cobro: {
-            inmuebleId: ip.inmuebleId
-          }
-        }
-      });
-
-      const gastos = await this.prisma.gastoInmueble.findMany({
-        where: {
-          inmuebleId: ip.inmuebleId
-        }
-      });
-
       const pct = parseFloat(ip.porcentaje.toString()) / 100;
 
-      const totalDistribuciones = distribuciones.reduce(
-        (sum, d) => sum + parseFloat(d.montoNeto.toString()), 0
-      );
+      // Obtener el cobro más reciente de esta propiedad
+      const ultimoCobro = await this.prisma.cobroAlquiler.findFirst({
+        where: { inmuebleId: ip.inmuebleId },
+        orderBy: { fechaCobro: 'desc' }
+      });
 
-      const totalGastos = gastos.reduce(
-        (sum, g) => sum + parseFloat(g.monto.toString()), 0
-      ) * pct;
+      const montoDistribuido = ultimoCobro
+        ? parseFloat(ultimoCobro.montoBruto.toString()) * pct
+        : 0;
+
+      const periodo = ultimoCobro?.periodo || null;
 
       saldosPorInmueble.push({
         inmueble: ip.inmueble,
-        saldo: totalDistribuciones - totalGastos
+        saldo: montoDistribuido,
+        periodo,
+        montoBruto: ultimoCobro ? parseFloat(ultimoCobro.montoBruto.toString()) : 0,
+        porcentajePropietario: pct * 100,
       });
     }
 

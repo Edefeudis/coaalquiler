@@ -395,28 +395,28 @@ export default function AdminCobrosPage() {
   }
 
   return (
-    <main className="min-h-screen bg-blue-50">
-      <nav className="bg-white shadow-sm border-b border-blue-200">
+    <main className="min-h-screen bg-[#FAFAFA]">
+      <nav className="bg-teal-700 shadow-lg border-b border-teal-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center space-x-4">
-              <a href="/admin/dashboard" className="text-blue-600 hover:text-blue-700">
+              <a href="/admin/dashboard" className="text-[#B8E6E6] hover:text-white transition-colors">
                 ← Dashboard
               </a>
-              <h1 className="text-xl font-bold text-blue-900">Reporte por Período</h1>
+              <h1 className="text-xl font-bold text-[#F5F0EB]">Reporte por Período</h1>
             </div>
             <div className="flex space-x-2">
               {resumenPeriodo && (
                 <button
                   onClick={generarReportePDF}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                  className="px-4 py-2 bg-copper-400 hover:bg-copper-500 text-white rounded-md transition-colors"
                 >
                   Exportar PDF
                 </button>
               )}
               <button
                 onClick={() => setShowForm(!showForm)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-md transition-colors"
               >
                 {showForm ? 'Cancelar' : 'Nuevo Cobro'}
               </button>
@@ -427,20 +427,20 @@ export default function AdminCobrosPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Selector de período - principal */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-bold text-blue-900 mb-4">Seleccionar Período</h2>
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-teal-100">
+          <h2 className="text-xl font-bold text-teal-700 mb-4">Seleccionar Período</h2>
           <div>
-            <label className="block text-sm font-medium text-blue-800 mb-1">Mes y Año</label>
+            <label className="block text-sm font-medium text-teal-600 mb-1">Mes y Año</label>
             <input
               type="month"
               value={periodoSeleccionado}
               onChange={e => setPeriodoSeleccionado(e.target.value)}
-                    className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-teal-200 rounded-md focus:outline-none focus:ring-2 focus:ring-copper-400"
             />
           </div>
           {periodoSeleccionado && (
-            <div className="mt-4 p-4 bg-blue-50 rounded-md">
-              <p className="text-sm text-indigo-800">
+            <div className="mt-4 p-4 bg-teal-50 rounded-md">
+              <p className="text-sm text-teal-800">
                 Mostrando datos del período: <strong>{(() => {
   const [year, month] = periodoSeleccionado.split('-');
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];

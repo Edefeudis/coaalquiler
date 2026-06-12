@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { CuentaCorrienteService } from './cuenta-corriente.service';
 
 @Injectable()
 export class DistribucionService{
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
+    private readonly cuentaCorriente: CuentaCorrienteService,
   ){}
 
   /**
@@ -90,6 +92,19 @@ export class DistribucionService{
 
       return results;
     });
+
+    // Registrar CREDITO en CuentaCorriente para cada propietario
+    for (const dist of distribuciones) {
+      await this.cuentaCorriente.registrarMovimiento({
+        propietarioId: dist.propietarioId,
+        inmuebleId: cobro.inmuebleId,
+        tipoMovimiento: 'DISTRIBUCION',
+        monto: parseFloat(dist.montoNeto.toString()),
+        referencia: `Cobro ${cobroId}`,
+        referenciaId: cobroId,
+        descripcion: `Distribución cobro ${cobro.inmueble.direccion} - Período ${cobro.periodo}`,
+      });
+    }
 
     await this.auditoria.registrar({
       entidad:'CobroAlquiler',
