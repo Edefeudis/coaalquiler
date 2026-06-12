@@ -55,14 +55,17 @@ export class ReciboService {
       orderBy: { fecha: 'asc' },
     });
 
-    // Obtener movimientos de CuentaCorriente del propietario en el período
-    const movimientosCC = await this.prisma.cuentaCorriente.findMany({
-      where: {
-        propietarioId,
-        fecha: { gte: ini, lte: fin },
-      },
+    // Obtener TODOS los movimientos de CuentaCorriente del propietario
+    // y filtrar en JS (porque SQLite almacena fechas en formato texto
+    // que no permite comparación correcta vía SQL)
+    const todosLosMovimientosCC = await this.prisma.cuentaCorriente.findMany({
+      where: { propietarioId },
       orderBy: { fecha: 'asc' },
     });
+
+    const movimientosCC = todosLosMovimientosCC.filter(
+      m => { const f = new Date(m.fecha); return f >= ini && f <= fin; },
+    );
 
     // Calcular totales
     let totalDistribuciones = 0;
@@ -86,6 +89,65 @@ export class ReciboService {
       if (mov.tipoMovimiento === 'DEBITO' || mov.tipoMovimiento === 'AJUSTE_NEGATIVO') {
         totalRetiros += parseFloat(mov.monto.toString());
       }
+    }
+
+    // ── Calcular saldoAnterior usando la misma lógica que obtenerSaldoActual ──
+    // Créditos: cobros(gross) × % - gastos × %  (antes del período)
+    const cobrosAntes = await this.prisma.cobroAlquiler.findMany({
+      where: {
+        inmuebleId: { in: idsInmuebles },
+        fechaCobro: { lt: ini },
+      },
+    });
+
+    const gastosAntes = await this.prisma.gastoInmueble.findMany({
+      where: {
+        inmuebleId: { in: idsInmuebles },
+        fecha: { lt: ini },
+      },
+    });
+
+    // Filtrar movimientos CC antes del período en JS (mismo motivo que arriba)
+    const movimientosCCAntes = todosLosMovimientosCC.filter(
+      m => new Date(m.fecha) < ini,
+    );
+
+    let saldoAnterior = 0;
+    for (const ip of inmueblePropietarios) {
+      const pct = parseFloat(ip.porcentaje.toString()) / 100;
+      const totalCobrosInmueble = cobrosAntes
+        .filter(c => c.inmuebleId === ip.inmuebleId)
+        .reduce((sum, c) => sum + parseFloat(c.montoBruto.toString()), 0);
+      saldoAnterior += totalCobrosInmueble * pct;
+
+      const totalGastosInmueble = gastosAntes
+        .filter(g => g.inmuebleId === ip.inmuebleId)
+        .reduce((sum, g) => sum + parseFloat(g.monto.toString()), 0);
+      saldoAnterior -= totalGastosInmueble * pct;
+    }
+
+    // Restar débitos y sumar/restar ajustes de CuentaCorriente (antes del período)
+    for (const m of movimientosCCAntes) {
+      const monto = parseFloat(m.monto.toString());
+      if (m.tipoMovimiento === 'DEBITO' || m.tipoMovimiento === 'AJUSTE_NEGATIVO') {
+        saldoAnterior -= monto;
+      } else if (m.tipoMovimiento === 'AJUSTE_POSITIVO') {
+        saldoAnterior += monto;
+      }
+      // DISTRIBUCION y CREDITO ya están incluidos vía cobros, no se suman de nuevo
+    }
+
+    // ── Calcular totalAcreditado del período: cobros(gross) × % - gastos × % ──
+    let totalAcreditado = 0;
+    for (const ip of inmueblePropietarios) {
+      const pct = parseFloat(ip.porcentaje.toString()) / 100;
+      const totalCobrosInmueble = cobros
+        .filter(c => c.inmuebleId === ip.inmuebleId)
+        .reduce((sum, c) => sum + parseFloat(c.montoBruto.toString()), 0);
+      const totalGastosInmueble = gastos
+        .filter(g => g.inmuebleId === ip.inmuebleId)
+        .reduce((sum, g) => sum + parseFloat(g.monto.toString()), 0);
+      totalAcreditado += (totalCobrosInmueble - totalGastosInmueble) * pct;
     }
 
     // Obtener distribuciones detalladas por inmueble
@@ -127,26 +189,6 @@ export class ReciboService {
         };
       })
     );
-
-    // Saldo anterior al período
-    const movimientosAntes = await this.prisma.cuentaCorriente.findMany({
-      where: {
-        propietarioId,
-        fecha: { lt: ini },
-      },
-      orderBy: { fecha: 'desc' },
-    });
-
-    const saldoAnterior = movimientosAntes.reduce((sum, m) => {
-      if (m.tipoMovimiento === 'DISTRIBUCION') return sum + parseFloat(m.monto.toString());
-      if (m.tipoMovimiento === 'DEBITO' || m.tipoMovimiento === 'AJUSTE_NEGATIVO') return sum - parseFloat(m.monto.toString());
-      if (m.tipoMovimiento === 'AJUSTE_POSITIVO') return sum + parseFloat(m.monto.toString());
-      return sum;
-    }, 0);
-
-    const totalAcreditado = movimientosCC
-      .filter(m => m.tipoMovimiento === 'DISTRIBUCION')
-      .reduce((sum, m) => sum + parseFloat(m.monto.toString()), 0);
 
     const saldoFinal = saldoAnterior + totalAcreditado - totalRetiros;
 
