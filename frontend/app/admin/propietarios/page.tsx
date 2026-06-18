@@ -8,6 +8,8 @@ export default function AdminPropietariosPage() {
   const [propietarios, setPropietarios] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ nombre: '', email: '' });
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editData, setEditData] = useState({ nombre: '', email: '' });
   const router = useRouter();
 
   useEffect(() => {
@@ -24,12 +26,9 @@ export default function AdminPropietariosPage() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      console.log('Token en fetchPropietarios:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN');
-      console.log('Authorization header:', `Bearer ${token}`);
       const res = await fetch('http://localhost:3000/api/propietarios', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      console.log('Response status:', res.status);
       if (res.ok) {
         const data = await res.json();
         setPropietarios(data);
@@ -48,8 +47,6 @@ export default function AdminPropietariosPage() {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      console.log('Token en handleSubmit:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN');
-      console.log('FormData:', formData);
       const res = await fetch('http://localhost:3000/api/propietarios', {
         method: 'POST',
         headers: { 
@@ -58,20 +55,55 @@ export default function AdminPropietariosPage() {
         },
         body: JSON.stringify(formData)
       });
-      console.log('Response status:', res.status);
       if (res.ok) {
         setShowForm(false);
         setFormData({ nombre: '', email: '' });
         fetchPropietarios();
       } else {
         const errorText = await res.text();
-        console.error('Error response:', errorText);
         alert(`Error: ${errorText}`);
       }
     } catch (err) {
       console.error('Error creating propietario:', err);
       alert('Error al crear propietario');
     }
+  }
+
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (editId === null) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:3000/api/propietarios/${editId}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(editData)
+      });
+      if (res.ok) {
+        setEditId(null);
+        setEditData({ nombre: '', email: '' });
+        fetchPropietarios();
+      } else {
+        const errorText = await res.text();
+        alert(`Error: ${errorText}`);
+      }
+    } catch (err) {
+      console.error('Error updating propietario:', err);
+      alert('Error al actualizar propietario');
+    }
+  }
+
+  function startEdit(p: any) {
+    setEditId(p.id);
+    setEditData({ nombre: p.nombre, email: p.email });
+  }
+
+  function cancelEdit() {
+    setEditId(null);
+    setEditData({ nombre: '', email: '' });
   }
 
   async function handleDeletePropietario(id: number) {
@@ -173,23 +205,69 @@ export default function AdminPropietariosPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {propietarios.map((propietario) => (
                     <tr key={propietario.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{propietario.id}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{propietario.nombre}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{propietario.email}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <a 
-                          href={`/admin/inmuebles?propietarioId=${propietario.id}`}
-                          className="text-blue-600 hover:text-blue-700 mr-4"
-                        >
-                          Ver Inmuebles
-                        </a>
-                        <button 
-                          onClick={() => handleDeletePropietario(propietario.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          Eliminar
-                        </button>
-                      </td>
+                      {editId === propietario.id ? (
+                        <>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{propietario.id}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <input
+                              type="text"
+                              value={editData.nombre}
+                              onChange={e => setEditData({...editData, nombre: e.target.value})}
+                              required
+                              className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <input
+                              type="email"
+                              value={editData.email}
+                              onChange={e => setEditData({...editData, email: e.target.value})}
+                              required
+                              className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                            <button
+                              onClick={handleEdit}
+                              className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-xs"
+                            >
+                              Guardar
+                            </button>
+                            <button
+                              onClick={cancelEdit}
+                              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 text-xs"
+                            >
+                              Cancelar
+                            </button>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{propietario.id}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{propietario.nombre}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{propietario.email}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 space-x-2">
+                            <button
+                              onClick={() => startEdit(propietario)}
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              Editar
+                            </button>
+                            <a 
+                              href={`/admin/inmuebles?propietarioId=${propietario.id}`}
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              Ver Inmuebles
+                            </a>
+                            <button 
+                              onClick={() => handleDeletePropietario(propietario.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              Eliminar
+                            </button>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>

@@ -165,6 +165,20 @@ export class PropietariosService{
   }
 
   /**
+   * Actualiza los datos de un propietario (nombre, email)
+   */
+  async update(id:number, data:{nombre?:string;email?:string}){
+    const propietario=await this.prisma.propietario.findUnique({where:{id}});
+    if(!propietario){
+      throw new NotFoundException(`Propietario ${id} no encontrado`);
+    }
+    return this.prisma.propietario.update({
+      where:{id},
+      data,
+    });
+  }
+
+  /**
    * Verifica que la suma de porcentajes de un inmueble sea exactamente 100%
    */
   async verificarPorcentajes(inmuebleId:number){

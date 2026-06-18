@@ -49,6 +49,15 @@ export class PropietariosController{
   }
 
   @Roles(Rol.ADMIN,Rol.EMPLEADO)
+  @Put(':id')
+  update(
+    @Param('id',ParseIntPipe)id:number,
+    @Body()data:{nombre?:string;email?:string}
+  ){
+    return this.propietariosService.update(id,data);
+  }
+
+  @Roles(Rol.ADMIN,Rol.EMPLEADO)
   @Post(':inmuebleId/copropietario/:propietarioId')
   agregarCopropietario(
     @Param('inmuebleId',ParseIntPipe)inmuebleId:number,
