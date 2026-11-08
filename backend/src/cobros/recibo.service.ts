@@ -131,7 +131,7 @@ export class ReciboService {
       const monto = parseFloat(m.monto.toString());
       if (m.tipoMovimiento === 'DEBITO' || m.tipoMovimiento === 'AJUSTE_NEGATIVO') {
         saldoAnterior -= monto;
-      } else if (m.tipoMovimiento === 'AJUSTE_POSITIVO') {
+      } else if (m.tipoMovimiento === 'AJUSTE_POSITIVO' || m.tipoMovimiento === 'APORTE') {
         saldoAnterior += monto;
       }
       // DISTRIBUCION y CREDITO ya están incluidos vía cobros, no se suman de nuevo

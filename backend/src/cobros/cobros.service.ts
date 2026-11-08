@@ -76,6 +76,15 @@ export class CobrosService{
     return ultimoCobro;
   }
 
+  /** Todos los cobros (opcionalmente de un período YYYY-MM), con inmueble y distribución. */
+  async obtenerTodos(periodo?:string){
+    return this.prisma.cobroAlquiler.findMany({
+      where:periodo?{periodo}:{},
+      include:{distribuciones:{include:{propietario:{select:{id:true,nombre:true,email:true}}}},inmueble:true},
+      orderBy:[{periodo:'desc'},{fechaCobro:'desc'}],
+    });
+  }
+
   async obtenerCobrosPorInmueble(inmuebleId:number){
     return this.prisma.cobroAlquiler.findMany({
       where:{inmuebleId},

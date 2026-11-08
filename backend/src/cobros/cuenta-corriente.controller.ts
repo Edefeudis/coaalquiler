@@ -16,6 +16,24 @@ export class CuentaCorrienteController {
     return this.cuentaCorrienteService.obtenerSaldoActual(propietarioId, inmuebleId ? parseInt(inmuebleId) : undefined);
   }
 
+  @Roles(Rol.ADMIN, Rol.EMPLEADO)
+  @Get('propietario/:propietarioId/transferible')
+  obtenerSaldoTransferible(@Param('propietarioId', ParseIntPipe) propietarioId: number) {
+    return this.cuentaCorrienteService.obtenerSaldoTransferible(propietarioId);
+  }
+
+  @Roles(Rol.ADMIN, Rol.EMPLEADO)
+  @Get('resumen-general')
+  obtenerResumenGeneral() {
+    return this.cuentaCorrienteService.obtenerResumenGeneral();
+  }
+
+  @Roles(Rol.ADMIN, Rol.EMPLEADO)
+  @Get('caja')
+  obtenerCajaDisponible() {
+    return this.cuentaCorrienteService.obtenerCajaDisponible();
+  }
+
   @Roles(Rol.ADMIN, Rol.EMPLEADO, Rol.PROPIETARIO)
   @Get('propietario/:propietarioId/movimientos')
   obtenerMovimientosPorPropietario(

@@ -20,6 +20,12 @@ export class CobrosController{
     return this.cobrosService.crearCobro(body);
   }
 
+  @Roles(Rol.ADMIN,Rol.EMPLEADO)
+  @Get()
+  obtenerTodos(@Query('periodo') periodo?:string){
+    return this.cobrosService.obtenerTodos(periodo && /^\d{4}-\d{2}$/.test(periodo) ? periodo : undefined);
+  }
+
   @Roles(Rol.ADMIN,Rol.EMPLEADO,Rol.PROPIETARIO)
   @Get('inmueble/:inmuebleId/filtrados')
   obtenerCobrosPorInmuebleConFiltros(

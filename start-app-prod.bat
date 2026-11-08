@@ -31,19 +31,14 @@ if not exist "prisma\dev.db" (
     echo %GREEN%Base de datos encontrada.%RESET%
 )
 
-echo %CYAN%[2/6]%RESET% Creando backup de la base de datos...
-cd backend
-call npm.cmd exec ts-node scripts/backup-db.ts
-cd ..
-echo %GREEN%Backup creado.%RESET%
 
-echo %CYAN%[3/6]%RESET% Verificando datos de seed...
+echo %CYAN%[2/6]%RESET% Verificando datos de seed...
 cd backend
 call npm.cmd exec ts-node scripts/seed-admin.ts
 cd ..
 echo %GREEN%Seed verificado.%RESET%
 
-echo %CYAN%[4/6]%RESET% COMPILANDO FRONTEND (esto tomara unos segundos)...
+echo %CYAN%[3/6]%RESET% COMPILANDO FRONTEND (esto tomara unos segundos)...
 cd frontend
 echo Ejecutando: npm run build
 call npm.cmd run build
@@ -56,17 +51,24 @@ if %ERRORLEVEL% NEQ 0 (
 echo %GREEN%Frontend compilado exitosamente!%RESET%
 cd ..
 
-echo %CYAN%[5/6]%RESET% Iniciando Backend (NestJS) en puerto 3000...
+echo %CYAN%[4/6]%RESET% Iniciando Backend (NestJS) en puerto 3000...
 start "Backend - NestJS (Puerto 3000)" cmd /c "cd backend && npm.cmd start"
 
 timeout /t 3 /nobreak >nul
 
-echo %CYAN%[6/6]%RESET% Iniciando Frontend (Next.js - MODO PRODUCCION) en puerto 3001...
+echo %CYAN%[5/6]%RESET% Iniciando Frontend (Next.js - MODO PRODUCCION) en puerto 3001...
 :: IMPORTANTE: next start usa los archivos pre-compilados de .next/
 :: No recompila nada en tiempo real. Todo quedo compilado en el paso 4.
 start "Frontend - Next.js (Puerto 3001) - MODO PRODUCCION" cmd /c "cd frontend && npm.cmd start"
 
 echo.
+
+echo %CYAN%[6/6]%RESET% Creando backup de la base de datos...
+cd backend
+call npm.cmd exec ts-node scripts/backup-db.ts
+cd ..
+echo %GREEN%Backup creado.%RESET%
+
 echo ====================================
 echo %GREEN%Aplicacion iniciada en MODO PRODUCCION!%RESET%
 echo ====================================

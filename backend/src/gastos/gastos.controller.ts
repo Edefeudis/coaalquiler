@@ -20,6 +20,26 @@ export class GastosController{
     });
   }
 
+  @Roles(Rol.ADMIN,Rol.EMPLEADO)
+  @Post('multiple')
+  crearGastoMultiple(@Body()body:{inmuebleIds:number[];concepto:string;monto:number;modo:'DIVIDIR'|'REPETIR';descripcion?:string;fecha?:string}){
+    return this.gastosService.crearGastoMultiple({
+      ...body,
+      monto:Number(body.monto),
+      modo:body.modo==='REPETIR'?'REPETIR':'DIVIDIR',
+      fecha:body.fecha?new Date(body.fecha):undefined,
+    });
+  }
+
+  @Roles(Rol.ADMIN,Rol.EMPLEADO)
+  @Get()
+  obtenerTodos(@Query('desde')desde?:string,@Query('hasta')hasta?:string){
+    return this.gastosService.obtenerTodosLosGastos(
+      desde?new Date(desde):undefined,
+      hasta?new Date(hasta):undefined,
+    );
+  }
+
   @Roles(Rol.ADMIN,Rol.EMPLEADO,Rol.PROPIETARIO)
   @Get('inmueble/:inmuebleId')
   obtenerGastos(
@@ -38,6 +58,18 @@ export class GastosController{
   @Get(':id')
   obtenerGasto(@Param('id',ParseIntPipe)id:number){
     return this.gastosService.obtenerGasto(id);
+  }
+
+  @Roles(Rol.ADMIN,Rol.EMPLEADO)
+  @Put('grupo/:grupoId')
+  actualizarGrupo(@Param('grupoId')grupoId:string,@Body()body:{concepto?:string;montoTotal?:number;descripcion?:string;fecha?:string}){
+    return this.gastosService.actualizarGrupo(grupoId,body);
+  }
+
+  @Roles(Rol.ADMIN,Rol.EMPLEADO)
+  @Delete('grupo/:grupoId')
+  eliminarGrupo(@Param('grupoId')grupoId:string){
+    return this.gastosService.eliminarGrupo(grupoId);
   }
 
   @Roles(Rol.ADMIN,Rol.EMPLEADO)

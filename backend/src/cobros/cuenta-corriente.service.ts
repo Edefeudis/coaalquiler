@@ -47,6 +47,14 @@ export class CuentaCorrienteService {
       saldo -= parseFloat(d.monto.toString());
     }
 
+    // Sumar APORTES (plata que el propietario puso para cubrir gastos)
+    const aportes = await this.prisma.cuentaCorriente.findMany({
+      where: { propietarioId, tipoMovimiento: 'APORTE' }
+    });
+    for (const a of aportes) {
+      saldo += parseFloat(a.monto.toString());
+    }
+
     // Sumar AJUSTES
     const ajustes = await this.prisma.cuentaCorriente.findMany({
       where: { propietarioId, tipoMovimiento: { in: ['AJUSTE_POSITIVO', 'AJUSTE_NEGATIVO'] } }
@@ -57,6 +65,118 @@ export class CuentaCorrienteService {
     }
 
     return saldo;
+  }
+
+  /**
+   * Caja disponible: plata que realmente hay para pagar.
+   * = cobros (brutos) + aportes - gastos - retiros (DEBITO).
+   * Los ajustes manuales son contables y no mueven plata, por eso no entran.
+   */
+  async obtenerCajaDisponible() {
+    const cobros = await this.prisma.cobroAlquiler.findMany({ select: { montoBruto: true } });
+    const gastos = await this.prisma.gastoInmueble.findMany({ select: { monto: true } });
+    const movs = await this.prisma.cuentaCorriente.findMany({
+      where: { tipoMovimiento: { in: ['DEBITO', 'APORTE'] } },
+      select: { tipoMovimiento: true, monto: true }
+    });
+    const num = (d: any) => parseFloat(d.toString());
+
+    const totalCobros = cobros.reduce((s, c) => s + num(c.montoBruto), 0);
+    const totalGastos = gastos.reduce((s, g) => s + num(g.monto), 0);
+    const totalAportes = movs.filter(m => m.tipoMovimiento === 'APORTE').reduce((s, m) => s + num(m.monto), 0);
+    const totalRetiros = movs.filter(m => m.tipoMovimiento === 'DEBITO').reduce((s, m) => s + num(m.monto), 0);
+
+    return {
+      caja: totalCobros + totalAportes - totalGastos - totalRetiros,
+      totalCobros,
+      totalAportes,
+      totalGastos,
+      totalRetiros,
+    };
+  }
+
+  /**
+   * Resumen de todos los propietarios: composición del saldo de cada uno y la caja.
+   * Misma lógica que obtenerSaldoActual, pero calculada en una sola pasada.
+   */
+  async obtenerResumenGeneral() {
+    const num = (d: any) => parseFloat(d.toString());
+    const [propietarios, cobros, gastos, movs, cajaInfo] = await Promise.all([
+      this.prisma.propietario.findMany({
+        select: {
+          id: true, nombre: true, email: true,
+          inmuebles: { where: { activo: true }, select: { inmuebleId: true, porcentaje: true } },
+        },
+        orderBy: { nombre: 'asc' },
+      }),
+      this.prisma.cobroAlquiler.findMany({ select: { inmuebleId: true, montoBruto: true } }),
+      this.prisma.gastoInmueble.findMany({ select: { inmuebleId: true, monto: true } }),
+      this.prisma.cuentaCorriente.findMany({
+        where: { tipoMovimiento: { in: ['DEBITO', 'APORTE', 'AJUSTE_POSITIVO', 'AJUSTE_NEGATIVO'] } },
+        select: { propietarioId: true, tipoMovimiento: true, monto: true },
+      }),
+      this.obtenerCajaDisponible(),
+    ]);
+
+    const cobrosPorInm = new Map<number, number>();
+    for (const c of cobros) cobrosPorInm.set(c.inmuebleId, (cobrosPorInm.get(c.inmuebleId) || 0) + num(c.montoBruto));
+    const gastosPorInm = new Map<number, number>();
+    for (const g of gastos) gastosPorInm.set(g.inmuebleId, (gastosPorInm.get(g.inmuebleId) || 0) + num(g.monto));
+
+    const caja = cajaInfo.caja;
+    const filas = propietarios.map(p => {
+      let cobrosP = 0, gastosP = 0;
+      for (const ip of p.inmuebles) {
+        const pct = num(ip.porcentaje) / 100;
+        cobrosP += (cobrosPorInm.get(ip.inmuebleId) || 0) * pct;
+        gastosP += (gastosPorInm.get(ip.inmuebleId) || 0) * pct;
+      }
+      const propios = movs.filter(m => m.propietarioId === p.id);
+      const suma = (tipo: string) => propios.filter(m => m.tipoMovimiento === tipo).reduce((s, m) => s + num(m.monto), 0);
+      const aportes = suma('APORTE');
+      const retiros = suma('DEBITO');
+      const ajustes = suma('AJUSTE_POSITIVO') - suma('AJUSTE_NEGATIVO');
+      const saldo = cobrosP - gastosP + aportes - retiros + ajustes;
+      const transferible = Math.max(0, Math.min(saldo, caja));
+      return {
+        propietario: { id: p.id, nombre: p.nombre, email: p.email },
+        cantidadInmuebles: p.inmuebles.length,
+        cobros: cobrosP,
+        gastos: gastosP,
+        aportes,
+        retiros,
+        ajustes,
+        saldo,
+        transferible,
+        pendienteDeCobro: Math.max(0, saldo - transferible),
+      };
+    });
+
+    return {
+      caja: cajaInfo,
+      propietarios: filas,
+      totales: {
+        aFavor: filas.reduce((s, f) => s + Math.max(0, f.saldo), 0),
+        adeudado: filas.reduce((s, f) => s + Math.min(0, f.saldo), 0),
+        saldoNeto: filas.reduce((s, f) => s + f.saldo, 0),
+      },
+    };
+  }
+
+  /**
+   * Monto que realmente se le puede transferir a un propietario:
+   * lo menor entre su saldo (derecho) y la caja disponible, nunca negativo.
+   */
+  async obtenerSaldoTransferible(propietarioId: number) {
+    const saldo = await this.obtenerSaldoActual(propietarioId);
+    const { caja } = await this.obtenerCajaDisponible();
+    const transferible = Math.max(0, Math.min(saldo, caja));
+    return {
+      saldo,
+      caja,
+      transferible,
+      pendienteDeCobro: Math.max(0, saldo - transferible),
+    };
   }
 
   async obtenerMovimientosPorPropietario(propietarioId: number, inmuebleId?: number) {
@@ -165,6 +285,26 @@ export class CuentaCorrienteService {
       });
     }
 
+    // Obtener aportes desde CuentaCorriente
+    const aportes = await this.prisma.cuentaCorriente.findMany({
+      where: { propietarioId, tipoMovimiento: 'APORTE' },
+      orderBy: { fecha: 'desc' }
+    });
+
+    for (const a of aportes) {
+      movimientos.push({
+        id: a.id + 50000,
+        fecha: a.fecha,
+        tipoMovimiento: 'APORTE',
+        descripcion: a.descripcion || 'Aporte para gastos',
+        monto: parseFloat(a.monto.toString()),
+        referencia: a.referencia || `Aporte ${a.id}`,
+        referenciaId: a.id,
+        saldoNuevo: 0,
+        inmueble: null
+      });
+    }
+
     // Obtener ajustes desde CuentaCorriente
     const ajustes = await this.prisma.cuentaCorriente.findMany({
       where: { propietarioId, tipoMovimiento: { in: ['AJUSTE_POSITIVO', 'AJUSTE_NEGATIVO'] } },
@@ -188,7 +328,7 @@ export class CuentaCorrienteService {
     // Calcular saldo total desde el más viejo (CREDITO suma, GASTO/DEBITO/AJUSTE_NEGATIVO restan)
     let saldoTotal = 0;
     for (const mov of [...movimientos].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())) {
-      if (mov.tipoMovimiento === 'CREDITO' || mov.tipoMovimiento === 'AJUSTE_POSITIVO') {
+      if (mov.tipoMovimiento === 'CREDITO' || mov.tipoMovimiento === 'AJUSTE_POSITIVO' || mov.tipoMovimiento === 'APORTE') {
         saldoTotal += mov.monto;
       } else {
         saldoTotal -= mov.monto;
@@ -202,7 +342,7 @@ export class CuentaCorrienteService {
     let saldoCorriente = saldoTotal;
     for (const mov of movimientos) {
       mov.saldoNuevo = saldoCorriente;
-      if (mov.tipoMovimiento === 'CREDITO' || mov.tipoMovimiento === 'AJUSTE_POSITIVO') {
+      if (mov.tipoMovimiento === 'CREDITO' || mov.tipoMovimiento === 'AJUSTE_POSITIVO' || mov.tipoMovimiento === 'APORTE') {
         saldoCorriente -= mov.monto;
       } else {
         saldoCorriente += mov.monto;
@@ -221,14 +361,32 @@ export class CuentaCorrienteService {
     referenciaId?: number;
     descripcion?: string;
   }) {
+    if (data.tipoMovimiento === 'DEBITO' || data.tipoMovimiento === 'APORTE') {
+      if (!(data.monto > 0)) {
+        throw new BadRequestException('El monto debe ser mayor a 0. Para registrar plata que puso el propietario use el tipo APORTE.');
+      }
+    }
+
+    if (data.tipoMovimiento === 'DEBITO') {
+      // No se puede transferir más que el saldo del propietario ni más que lo que hay en caja
+      const { saldo, caja, transferible } = await this.obtenerSaldoTransferible(data.propietarioId);
+      if (data.monto > transferible + 0.005) {
+        const motivo = caja < saldo
+          ? `no hay fondos suficientes en caja (caja: ${caja.toFixed(2)})`
+          : `supera el saldo del propietario (${saldo.toFixed(2)})`;
+        throw new BadRequestException(`No se puede transferir ${data.monto.toFixed(2)}: ${motivo}. Máximo transferible: ${transferible.toFixed(2)}.`);
+      }
+    }
+
     const saldoAnterior = await this.obtenerSaldoActual(data.propietarioId, data.inmuebleId);
-    
+
     let saldoNuevo = saldoAnterior;
-    
+
     // Calcular el nuevo saldo según el tipo de movimiento
     switch (data.tipoMovimiento) {
       case 'CREDITO':
       case 'DISTRIBUCION':
+      case 'APORTE':
         saldoNuevo = saldoAnterior + data.monto;
         break;
       case 'DEBITO':
@@ -323,6 +481,7 @@ export class CuentaCorrienteService {
   async obtenerResumenPropietario(propietarioId: number) {
     // Obtener saldo general
     const saldoGeneral = await this.obtenerSaldoActual(propietarioId);
+    const { caja, transferible, pendienteDeCobro } = await this.obtenerSaldoTransferible(propietarioId);
 
     // Obtener los inmuebles del propietario
     const inmueblePropietarios = await this.prisma.inmueblePropietario.findMany({
@@ -362,6 +521,9 @@ export class CuentaCorrienteService {
 
     return {
       saldoGeneral,
+      cajaDisponible: caja,
+      transferible,
+      pendienteDeCobro,
       saldosPorInmueble,
       ultimosMovimientos: ultimosMovimientos.slice(0, 10)
     };
@@ -461,8 +623,8 @@ export class CuentaCorrienteService {
     }
 
     // Solo permitir eliminar DEBITO (distribuciones/retiros)
-    if (movimiento.tipoMovimiento !== 'DEBITO' && movimiento.tipoMovimiento !== 'DISTRIBUCION') {
-      throw new BadRequestException('Solo se pueden eliminar movimientos de tipo DEBITO (retiros/distribuciones)');
+    if (!['DEBITO', 'DISTRIBUCION', 'APORTE'].includes(movimiento.tipoMovimiento)) {
+      throw new BadRequestException('Solo se pueden eliminar movimientos de tipo DEBITO, APORTE o DISTRIBUCION');
     }
 
     await this.prisma.cuentaCorriente.delete({

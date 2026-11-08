@@ -344,7 +344,7 @@ export default function AdminRecibosPage() {
                         </td>
                         <td className="px-3 py-2">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            mov.tipoMovimiento === 'DISTRIBUCION'
+                            mov.tipoMovimiento === 'DISTRIBUCION' || mov.tipoMovimiento === 'APORTE'
                               ? 'bg-teal-100 text-teal-700'
                               : mov.tipoMovimiento === 'DEBITO'
                               ? 'bg-copper-100 text-copper-600'
@@ -355,9 +355,9 @@ export default function AdminRecibosPage() {
                         </td>
                         <td className="px-3 py-2 text-teal-600">{mov.descripcion || '-'}</td>
                         <td className={`px-3 py-2 text-right font-medium ${
-                          mov.tipoMovimiento === 'DISTRIBUCION' ? 'text-teal-600' : 'text-copper-600'
+                          ['DISTRIBUCION', 'APORTE', 'AJUSTE_POSITIVO'].includes(mov.tipoMovimiento) ? 'text-teal-600' : 'text-copper-600'
                         }`}>
-                          {mov.tipoMovimiento === 'DISTRIBUCION' ? '+' : '-'}
+                          {['DISTRIBUCION', 'APORTE', 'AJUSTE_POSITIVO'].includes(mov.tipoMovimiento) ? '+' : '-'}
                           {formatCurrency(parseFloat(mov.monto))}
                         </td>
                         <td className="px-3 py-2 text-right text-teal-700 font-medium">

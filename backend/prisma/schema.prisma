@@ -65,12 +65,14 @@ model GastoInmueble {
   monto       Decimal
   fecha       DateTime @default(now())
   descripcion String?
+  grupoId     String?  // mismo valor en todas las partes de un gasto común cargado en varios inmuebles
   createdAt   DateTime @default(now())
 
   inmueble Inmueble @relation(fields: [inmuebleId], references: [id], onDelete: Cascade)
 
   @@index([inmuebleId])
   @@index([fecha])
+  @@index([grupoId])
 }
 
 model CobroAlquiler {
@@ -116,7 +118,7 @@ model CuentaCorriente {
   id              Int      @id @default(autoincrement())
   propietarioId   Int
   inmuebleId      Int?
-  tipoMovimiento  String   // CREDITO, DEBITO, DISTRIBUCION, GASTO, AJUSTE, AJUSTE_POSITIVO, AJUSTE_NEGATIVO
+  tipoMovimiento  String   // CREDITO, DEBITO (retiro/transferencia), APORTE (puso plata para gastos), DISTRIBUCION, GASTO, AJUSTE, AJUSTE_POSITIVO, AJUSTE_NEGATIVO
   monto           Decimal
   saldoAnterior   Decimal  @default(0)
   saldoNuevo      Decimal

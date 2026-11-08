@@ -39,9 +39,11 @@ logs/
 coverage/
 .nyc_output/
 
-# Prisma
+# Prisma / bases de datos (contienen datos reales de propietarios: nunca versionar)
 prisma/dev.db
 prisma/*.db
+*.db
+*.db-journal
 
 # Backups
 backups/
