@@ -3,6 +3,11 @@ import{PrismaService}from'../prisma/prisma.service';
 import{AuditoriaService}from'../auditoria/auditoria.service';
 import{randomUUID}from'crypto';
 
+/** CAJA (por defecto) o FONDO (fondo de reserva común). */
+function normalizarPagadoCon(v?:string){
+  return v==='FONDO'?'FONDO':'CAJA';
+}
+
 /** Reparte un total en n partes iguales en centavos; los centavos sobrantes van a las primeras partes. */
 function repartir(total:number,n:number){
   const cent=Math.round(total*100),base=Math.floor(cent/n),resto=cent-base*n;
@@ -16,7 +21,7 @@ export class GastosService{
     private readonly auditoria:AuditoriaService,
   ){}
 
-  async crearGasto(data:{inmuebleId:number;concepto:string;monto:number;descripcion?:string;fecha?:Date}){
+  async crearGasto(data:{inmuebleId:number;concepto:string;monto:number;descripcion?:string;fecha?:Date;pagadoCon?:string}){
     const inmueble=await this.prisma.inmueble.findUnique({where:{id:data.inmuebleId}});
     if(!inmueble)throw new NotFoundException(`Inmueble ${data.inmuebleId} no encontrado`);
 
@@ -27,6 +32,7 @@ export class GastosService{
         monto:data.monto,
         descripcion:data.descripcion,
         fecha:data.fecha??new Date(),
+        pagadoCon:normalizarPagadoCon(data.pagadoCon),
       },
     });
 
@@ -45,7 +51,7 @@ export class GastosService{
    * modo DIVIDIR: el monto total se reparte en partes iguales (los centavos sobrantes van al primero).
    * modo REPETIR: cada inmueble recibe el monto completo.
    */
-  async crearGastoMultiple(data:{inmuebleIds:number[];concepto:string;monto:number;modo:'DIVIDIR'|'REPETIR';descripcion?:string;fecha?:Date}){
+  async crearGastoMultiple(data:{inmuebleIds:number[];concepto:string;monto:number;modo:'DIVIDIR'|'REPETIR';descripcion?:string;fecha?:Date;pagadoCon?:string}){
     const ids=[...new Set(data.inmuebleIds)];
     if(ids.length===0)throw new BadRequestException('Seleccione al menos un inmueble');
     if(!(data.monto>0))throw new BadRequestException('El monto debe ser mayor a 0');
@@ -74,7 +80,7 @@ export class GastosService{
     const grupoId=ids.length>1?randomUUID():null;
     const gastos=await this.prisma.$transaction(
       ids.map((inmuebleId,i)=>this.prisma.gastoInmueble.create({
-        data:{inmuebleId,concepto:data.concepto,monto:montos[i],descripcion,fecha,grupoId},
+        data:{inmuebleId,concepto:data.concepto,monto:montos[i],descripcion,fecha,grupoId,pagadoCon:normalizarPagadoCon(data.pagadoCon)},
       })),
     );
 
@@ -130,15 +136,16 @@ export class GastosService{
     return gasto;
   }
 
-  async actualizarGasto(id:number,data:{concepto?:string;monto?:number;descripcion?:string;fecha?:string}){
+  async actualizarGasto(id:number,data:{concepto?:string;monto?:number;descripcion?:string;fecha?:string;pagadoCon?:string}){
     const gasto=await this.obtenerGasto(id);
     const actualizado=await this.prisma.gastoInmueble.update({
       where:{id},
       data:{
         ...(data.concepto!==undefined&&{concepto:data.concepto}),
-        ...(data.monto!==undefined&&{monto:data.monto}),
+        ...(data.monto!==undefined&&{monto:Number(data.monto)}),
         ...(data.descripcion!==undefined&&{descripcion:data.descripcion}),
         ...(data.fecha!==undefined&&{fecha:new Date(data.fecha)}),
+        ...(data.pagadoCon!==undefined&&{pagadoCon:normalizarPagadoCon(data.pagadoCon)}),
       },
     });
 
@@ -160,7 +167,7 @@ export class GastosService{
   }
 
   /** Edita todas las partes de un gasto común. Si cambia el total, se vuelve a repartir en partes iguales. */
-  async actualizarGrupo(grupoId:string,data:{concepto?:string;montoTotal?:number;descripcion?:string;fecha?:string}){
+  async actualizarGrupo(grupoId:string,data:{concepto?:string;montoTotal?:number;descripcion?:string;fecha?:string;pagadoCon?:string}){
     const partes=await this.obtenerGrupo(grupoId);
     if(data.montoTotal!==undefined&&!(Number(data.montoTotal)>0))throw new BadRequestException('El monto debe ser mayor a 0');
     const montos=data.montoTotal!==undefined?repartir(Number(data.montoTotal),partes.length):null;
@@ -182,6 +189,7 @@ export class GastosService{
         descripcion,
         ...(data.fecha!==undefined&&{fecha:new Date(data.fecha)}),
         ...(montos&&{monto:montos[i]}),
+        ...(data.pagadoCon!==undefined&&{pagadoCon:normalizarPagadoCon(data.pagadoCon)}),
       },
     })));
 

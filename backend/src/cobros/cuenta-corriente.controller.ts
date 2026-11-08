@@ -64,6 +64,12 @@ export class CuentaCorrienteController {
   }
 
   @Roles(Rol.ADMIN, Rol.EMPLEADO)
+  @Post('reserva')
+  registrarReservaMultiple(@Body() body: { items: { propietarioId: number; monto: number }[]; descripcion?: string; fecha?: string }) {
+    return this.cuentaCorrienteService.registrarReservaMultiple(body);
+  }
+
+  @Roles(Rol.ADMIN, Rol.EMPLEADO)
   @Post('ajuste')
   registrarAjusteManual(@Body() body: {
     propietarioId: number;

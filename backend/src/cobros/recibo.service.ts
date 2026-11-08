@@ -45,11 +45,12 @@ export class ReciboService {
       orderBy: { fechaCobro: 'asc' },
     });
 
-    // Obtener gastos del período
+    // Obtener gastos del período pagados con la caja (los del fondo de reserva no afectan al propietario)
     const gastos = await this.prisma.gastoInmueble.findMany({
       where: {
         inmuebleId: { in: idsInmuebles },
         fecha: { gte: ini, lte: fin },
+        pagadoCon: 'CAJA',
       },
       include: { inmueble: true },
       orderBy: { fecha: 'asc' },
@@ -86,7 +87,7 @@ export class ReciboService {
     }
 
     for (const mov of movimientosCC) {
-      if (mov.tipoMovimiento === 'DEBITO' || mov.tipoMovimiento === 'AJUSTE_NEGATIVO') {
+      if (mov.tipoMovimiento === 'DEBITO' || mov.tipoMovimiento === 'RESERVA' || mov.tipoMovimiento === 'AJUSTE_NEGATIVO') {
         totalRetiros += parseFloat(mov.monto.toString());
       }
     }
@@ -104,6 +105,7 @@ export class ReciboService {
       where: {
         inmuebleId: { in: idsInmuebles },
         fecha: { lt: ini },
+        pagadoCon: 'CAJA',
       },
     });
 
@@ -129,7 +131,7 @@ export class ReciboService {
     // Restar débitos y sumar/restar ajustes de CuentaCorriente (antes del período)
     for (const m of movimientosCCAntes) {
       const monto = parseFloat(m.monto.toString());
-      if (m.tipoMovimiento === 'DEBITO' || m.tipoMovimiento === 'AJUSTE_NEGATIVO') {
+      if (m.tipoMovimiento === 'DEBITO' || m.tipoMovimiento === 'RESERVA' || m.tipoMovimiento === 'AJUSTE_NEGATIVO') {
         saldoAnterior -= monto;
       } else if (m.tipoMovimiento === 'AJUSTE_POSITIVO' || m.tipoMovimiento === 'APORTE') {
         saldoAnterior += monto;

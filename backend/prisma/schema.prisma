@@ -66,6 +66,7 @@ model GastoInmueble {
   fecha       DateTime @default(now())
   descripcion String?
   grupoId     String?  // mismo valor en todas las partes de un gasto común cargado en varios inmuebles
+  pagadoCon   String   @default("CAJA") // CAJA (descuenta de caja y cuentas corrientes) | FONDO (sale del fondo de reserva)
   createdAt   DateTime @default(now())
 
   inmueble Inmueble @relation(fields: [inmuebleId], references: [id], onDelete: Cascade)
@@ -112,6 +113,19 @@ model DistribucionCobro {
   @@unique([cobroId, propietarioId])
   @@index([cobroId])
   @@index([propietarioId])
+}
+
+// Fondo de reserva común: plata que los propietarios separan e invierten para cubrir gastos.
+// Saldo = SALDO_INICIAL + INTERES + AJUSTE_POSITIVO - AJUSTE_NEGATIVO - gastos con pagadoCon = FONDO
+model MovimientoFondo {
+  id          Int      @id @default(autoincrement())
+  tipo        String   // SALDO_INICIAL, INTERES, AJUSTE_POSITIVO, AJUSTE_NEGATIVO
+  monto       Decimal
+  fecha       DateTime @default(now())
+  descripcion String?
+  createdAt   DateTime @default(now())
+
+  @@index([fecha])
 }
 
 model CuentaCorriente {

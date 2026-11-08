@@ -13,7 +13,7 @@ export class GastosController{
 
   @Roles(Rol.ADMIN,Rol.EMPLEADO)
   @Post()
-  crearGasto(@Body()body:{inmuebleId:number;concepto:string;monto:number;descripcion?:string;fecha?:string}){
+  crearGasto(@Body()body:{inmuebleId:number;concepto:string;monto:number;descripcion?:string;fecha?:string;pagadoCon?:string}){
     return this.gastosService.crearGasto({
       ...body,
       fecha:body.fecha?new Date(body.fecha):undefined,
@@ -22,7 +22,7 @@ export class GastosController{
 
   @Roles(Rol.ADMIN,Rol.EMPLEADO)
   @Post('multiple')
-  crearGastoMultiple(@Body()body:{inmuebleIds:number[];concepto:string;monto:number;modo:'DIVIDIR'|'REPETIR';descripcion?:string;fecha?:string}){
+  crearGastoMultiple(@Body()body:{inmuebleIds:number[];concepto:string;monto:number;modo:'DIVIDIR'|'REPETIR';descripcion?:string;fecha?:string;pagadoCon?:string}){
     return this.gastosService.crearGastoMultiple({
       ...body,
       monto:Number(body.monto),
@@ -62,7 +62,7 @@ export class GastosController{
 
   @Roles(Rol.ADMIN,Rol.EMPLEADO)
   @Put('grupo/:grupoId')
-  actualizarGrupo(@Param('grupoId')grupoId:string,@Body()body:{concepto?:string;montoTotal?:number;descripcion?:string;fecha?:string}){
+  actualizarGrupo(@Param('grupoId')grupoId:string,@Body()body:{concepto?:string;montoTotal?:number;descripcion?:string;fecha?:string;pagadoCon?:string}){
     return this.gastosService.actualizarGrupo(grupoId,body);
   }
 
@@ -74,7 +74,7 @@ export class GastosController{
 
   @Roles(Rol.ADMIN,Rol.EMPLEADO)
   @Put(':id')
-  actualizarGasto(@Param('id',ParseIntPipe)id:number,@Body()body:{concepto?:string;monto?:number;descripcion?:string;fecha?:string}){
+  actualizarGasto(@Param('id',ParseIntPipe)id:number,@Body()body:{concepto?:string;monto?:number;descripcion?:string;fecha?:string;pagadoCon?:string}){
     return this.gastosService.actualizarGasto(id,body);
   }
 

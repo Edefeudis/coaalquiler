@@ -13,8 +13,10 @@ type Inmueble = { id: number; direccion: string; propietarios?: any[] };
 type Gasto = {
   id: number; inmuebleId: number; concepto: string; monto: any; descripcion?: string; fecha: string;
   grupoId?: string | null;
+  pagadoCon?: 'CAJA' | 'FONDO';
   inmueble?: Inmueble;
 };
+type PagadoCon = 'CAJA' | 'FONDO';
 // Una fila del listado: un gasto suelto o un gasto común (varias partes con el mismo grupoId)
 type Fila = { key: string; grupoId: string | null; gasto: Gasto; partes: Gasto[]; total: number };
 
@@ -34,7 +36,23 @@ const hoyISO = () => {
 const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-copper-300 focus:border-copper-300 text-gray-900 bg-white';
 const labelCls = 'block text-sm font-medium text-gray-600 mb-1';
 
-const formVacio = { concepto: '', monto: '', descripcion: '', fecha: hoyISO() };
+const formVacio = { concepto: '', monto: '', descripcion: '', fecha: hoyISO(), pagadoCon: 'CAJA' as PagadoCon };
+
+/** Selector Caja / Fondo de reserva */
+function SelectorPagadoCon({ value, onChange, saldoFondo }: { value: PagadoCon; onChange: (v: PagadoCon) => void; saldoFondo: number | null }) {
+  return (
+    <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+      {([['CAJA', 'Caja'], ['FONDO', 'Fondo de reserva']] as const).map(([v, t]) => (
+        <button
+          key={v} type="button" onClick={() => onChange(v)}
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${value === v ? 'bg-white shadow-sm text-teal-700' : 'text-gray-500 hover:text-teal-600'}`}
+        >
+          {t}{v === 'FONDO' && saldoFondo !== null && <span className="ml-1 text-xs text-gray-400">({fmt(saldoFondo)})</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function AdminGastosPage() {
   const router = useRouter();
@@ -57,8 +75,16 @@ export default function AdminGastosPage() {
 
   // Edición / detalle
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ concepto: '', monto: '', descripcion: '', fecha: '' });
+  const [editForm, setEditForm] = useState({ concepto: '', monto: '', descripcion: '', fecha: '', pagadoCon: 'CAJA' as PagadoCon });
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  const [saldoFondo, setSaldoFondo] = useState<number | null>(null);
+
+  async function fetchSaldoFondo() {
+    try {
+      const res = await fetch(`${API}/fondo/saldo`, { headers: headers() });
+      if (res.ok) setSaldoFondo((await res.json()).saldo);
+    } catch {}
+  }
 
   useEffect(() => {
     if (!localStorage.getItem('token')) {
@@ -90,6 +116,7 @@ export default function AdminGastosPage() {
 
   async function fetchGastos() {
     setCargando(true);
+    fetchSaldoFondo();
     try {
       const params = new URLSearchParams();
       if (filtroMes) {
@@ -163,6 +190,7 @@ export default function AdminGastosPage() {
     const total = gastos.reduce((s, g) => s + num(g.monto), 0);
     const porProp = new Map<number, { nombre: string; monto: number }>();
     for (const g of gastos) {
+      if (g.pagadoCon === 'FONDO') continue; // lo paga el fondo común, no se le descuenta a nadie
       for (const d of distribucion(g)) {
         const prev = porProp.get(d.propietarioId) || { nombre: d.nombre, monto: 0 };
         prev.monto += d.monto;
@@ -202,6 +230,7 @@ export default function AdminGastosPage() {
         monto: montoForm,
         descripcion: form.descripcion.trim() || undefined,
         fecha: form.fecha || undefined,
+        pagadoCon: form.pagadoCon,
       };
       const res = alcance === 'uno'
         ? await fetch(`${API}/gastos`, {
@@ -239,6 +268,7 @@ export default function AdminGastosPage() {
               montoTotal: num(editForm.monto),
               descripcion: editForm.descripcion,
               fecha: editForm.fecha,
+              pagadoCon: editForm.pagadoCon,
             }),
           })
         : await fetch(`${API}/gastos/${f.gasto.id}`, {
@@ -248,6 +278,7 @@ export default function AdminGastosPage() {
               monto: num(editForm.monto),
               descripcion: editForm.descripcion,
               fecha: editForm.fecha,
+              pagadoCon: editForm.pagadoCon,
             }),
           });
       if (res.ok) {
@@ -442,7 +473,7 @@ export default function AdminGastosPage() {
                 <label className={labelCls}>Fecha</label>
                 <input type="date" value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })} className={inputCls} />
               </div>
-              <div className="md:col-span-3">
+              <div className="md:col-span-2">
                 <label className={labelCls}>Descripción <span className="text-gray-400 font-normal">(opcional)</span></label>
                 <input
                   type="text" value={form.descripcion}
@@ -450,7 +481,18 @@ export default function AdminGastosPage() {
                   className={inputCls}
                 />
               </div>
+              <div>
+                <label className={labelCls}>Pagado con</label>
+                <SelectorPagadoCon value={form.pagadoCon} onChange={v => setForm({ ...form, pagadoCon: v })} saldoFondo={saldoFondo} />
+              </div>
             </div>
+            {form.pagadoCon === 'FONDO' && (
+              <p className={`mt-3 text-sm ${saldoFondo !== null && totalACargar > saldoFondo + 0.005 ? 'text-amber-700' : 'text-gray-500'}`}>
+                {saldoFondo !== null && totalACargar > saldoFondo + 0.005
+                  ? `⚠ El fondo tiene ${fmt(saldoFondo)}: este gasto lo dejaría en negativo.`
+                  : 'Sale del fondo de reserva común: no descuenta de la caja ni de las cuentas corrientes de los propietarios.'}
+              </p>
+            )}
 
             <div className="flex flex-wrap items-center justify-between gap-4 mt-6 pt-5 border-t border-gray-100">
               <p className="text-sm text-gray-600">
@@ -595,6 +637,9 @@ export default function AdminGastosPage() {
                           <td className="px-3 py-3">
                             <p className="font-medium text-teal-700">{g.concepto}</p>
                             {desc && <p className="text-xs text-gray-500 mt-0.5">{desc}</p>}
+                            {g.pagadoCon === 'FONDO' && (
+                              <span className="inline-flex mt-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-aqua-100 text-teal-700">Pagado con fondo de reserva</span>
+                            )}
                           </td>
                           <td className="px-3 py-3 text-right font-semibold text-gray-900 tabular-nums whitespace-nowrap">{fmt(f.total)}</td>
                           <td className="px-3 py-3">
@@ -607,6 +652,7 @@ export default function AdminGastosPage() {
                                     monto: String(Math.round(f.total * 100) / 100),
                                     descripcion: (esGrupo ? sinNota(g.descripcion) : g.descripcion) || '',
                                     fecha: new Date(g.fecha).toISOString().split('T')[0],
+                                    pagadoCon: g.pagadoCon === 'FONDO' ? 'FONDO' : 'CAJA',
                                   });
                                 }}
                                 className="p-1.5 rounded-md text-gray-500 hover:text-teal-600 hover:bg-teal-50" title={esGrupo ? 'Editar gasto común' : 'Editar'}
@@ -643,6 +689,11 @@ export default function AdminGastosPage() {
                                   <label className="block text-xs text-gray-500 mb-1">Descripción</label>
                                   <input value={editForm.descripcion} onChange={e => setEditForm({ ...editForm, descripcion: e.target.value })} className={inputCls} />
                                 </div>
+                                <div className="md:col-span-4 flex flex-wrap items-center gap-3">
+                                  <span className="text-xs text-gray-500">Pagado con</span>
+                                  <SelectorPagadoCon value={editForm.pagadoCon} onChange={v => setEditForm({ ...editForm, pagadoCon: v })} saldoFondo={saldoFondo} />
+                                  {esGrupo && <span className="text-xs text-gray-400">Se aplica a las {f.partes.length} partes</span>}
+                                </div>
                                 <div className="md:col-span-4 flex justify-end gap-2">
                                   <button onClick={() => setEditingId(null)} className="px-3 py-1.5 rounded-lg text-sm text-gray-600 bg-gray-100 hover:bg-gray-200">Cancelar</button>
                                   <button onClick={() => handleUpdate(f)} className="px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-teal-500 hover:bg-teal-600">Guardar</button>
@@ -671,7 +722,9 @@ export default function AdminGastosPage() {
                                 )}
                                 <div>
                                   <p className="text-xs font-medium text-gray-500 mb-2">Por propietario</p>
-                                  {dist.length === 0 ? (
+                                  {g.pagadoCon === 'FONDO' ? (
+                                    <p className="text-xs text-gray-500">Pagado con el fondo de reserva común: no se descuenta de la cuenta corriente de ningún propietario.</p>
+                                  ) : dist.length === 0 ? (
                                     <p className="text-xs text-gray-400">Este inmueble no tiene propietarios activos.</p>
                                   ) : (
                                     <div className="flex flex-wrap gap-2">

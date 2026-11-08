@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Users, Building2, Wallet, ClipboardList, Receipt, Landmark, History, FileText,
-  ShieldCheck, LogOut, ArrowRight, AlertTriangle, CheckCircle2, Clock, type LucideIcon,
+  ShieldCheck, LogOut, ArrowRight, AlertTriangle, CheckCircle2, Clock, PiggyBank, type LucideIcon,
 } from 'lucide-react';
 
 const API = 'http://localhost:3000/api';
@@ -19,6 +19,7 @@ const GRUPOS: { titulo: string; modulos: Modulo[] }[] = [
       { title: 'Gastos', desc: 'Control de gastos por inmueble', href: '/admin/gastos', icon: ClipboardList },
       { title: 'Cuenta Corriente', desc: 'Saldos, aportes y transferencias', href: '/admin/cuenta-corriente', icon: Landmark },
       { title: 'Recibos', desc: 'Reimpresión de recibos por período', href: '/admin/recibos', icon: FileText },
+      { title: 'Fondo de reserva', desc: 'Inversión común, intereses y gastos', href: '/admin/fondo', icon: PiggyBank },
     ],
   },
   {
@@ -48,6 +49,7 @@ export default function AdminDashboardPage() {
   const [caja, setCaja] = useState<number | null>(null);
   const [saldos, setSaldos] = useState<{ id: number; nombre: string; saldo: number }[]>([]);
   const [cantInmuebles, setCantInmuebles] = useState<number | null>(null);
+  const [fondo, setFondo] = useState<number | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -73,13 +75,15 @@ export default function AdminDashboardPage() {
       }
     };
 
-    const [cajaData, propietarios, inmuebles] = await Promise.all([
+    const [cajaData, propietarios, inmuebles, fondoData] = await Promise.all([
       get('/cuenta-corriente/caja'),
       get('/propietarios'),
       get('/inmuebles'),
+      get('/fondo/saldo'),
     ]);
 
     if (cajaData) setCaja(cajaData.caja);
+    if (fondoData) setFondo(fondoData.saldo);
     if (Array.isArray(inmuebles)) setCantInmuebles(inmuebles.length);
     if (Array.isArray(propietarios)) {
       const lista = await Promise.all(
@@ -185,6 +189,10 @@ export default function AdminDashboardPage() {
               <div>
                 <p className="text-gray-500 text-xs">Propietarios</p>
                 <p className="font-semibold text-teal-700">{saldos.length || '—'}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-xs">Fondo de reserva</p>
+                <p className="font-semibold text-teal-700 tabular-nums">{fondo === null ? '—' : formatCurrency(fondo)}</p>
               </div>
             </div>
           </a>

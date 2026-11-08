@@ -13,7 +13,7 @@ const API = 'http://localhost:3000/api';
 type FilaResumen = {
   propietario: { id: number; nombre: string; email: string };
   cantidadInmuebles: number;
-  cobros: number; gastos: number; aportes: number; retiros: number; ajustes: number;
+  cobros: number; gastos: number; aportes: number; retiros: number; reservas: number; ajustes: number;
   saldo: number; transferible: number; pendienteDeCobro: number;
 };
 type ResumenGeneral = {
@@ -34,6 +34,7 @@ const TIPOS: Record<string, { label: string; credito: boolean; cls: string }> = 
   AJUSTE_POSITIVO: { label: 'Ajuste +', credito: true, cls: 'bg-gray-100 text-gray-700' },
   GASTO: { label: 'Gasto', credito: false, cls: 'bg-copper-50 text-copper-600' },
   DEBITO: { label: 'Transferencia', credito: false, cls: 'bg-copper-100 text-copper-700' },
+  RESERVA: { label: 'Reserva al fondo', credito: false, cls: 'bg-aqua-100 text-teal-700' },
   AJUSTE_NEGATIVO: { label: 'Ajuste −', credito: false, cls: 'bg-gray-100 text-gray-700' },
 };
 
@@ -43,7 +44,15 @@ const FILTROS = [
   { key: 'GASTO', label: 'Gastos' },
   { key: 'APORTE', label: 'Aportes' },
   { key: 'DEBITO', label: 'Transferencias' },
+  { key: 'RESERVA', label: 'Reservas' },
 ];
+
+type TipoForm = 'DEBITO' | 'APORTE' | 'RESERVA';
+const FORM_TEXTOS: Record<TipoForm, { titulo: string; confirmar: string; placeholder: string; porDefecto: string }> = {
+  DEBITO: { titulo: 'Registrar transferencia al propietario', confirmar: 'Confirmar transferencia', placeholder: 'Ej: transferencia noviembre', porDefecto: 'Transferencia al propietario' },
+  APORTE: { titulo: 'Registrar aporte · el propietario pone plata para cubrir gastos', confirmar: 'Confirmar aporte', placeholder: 'Ej: aporte 04/11/26 para pago monotributo', porDefecto: 'Aporte para gastos' },
+  RESERVA: { titulo: 'Reservar al fondo · parte del saldo queda en el fondo de reserva común', confirmar: 'Confirmar reserva', placeholder: 'Ej: reserva distribución noviembre', porDefecto: 'Reserva al fondo' },
+};
 
 function estadoDe(f: { saldo: number; transferible: number; pendienteDeCobro: number }) {
   if (f.saldo < -EPS) return { label: 'Debe aportar', cls: 'bg-copper-50 text-copper-600 border-copper-200', icon: AlertTriangle };
@@ -65,8 +74,9 @@ export default function AdminCuentaCorrientePage() {
 
   // Formulario de transferencia / aporte
   const [showForm, setShowForm] = useState(false);
-  const [tipoForm, setTipoForm] = useState<'DEBITO' | 'APORTE'>('DEBITO');
+  const [tipoForm, setTipoForm] = useState<TipoForm>('DEBITO');
   const [form, setForm] = useState({ monto: '', descripcion: '' });
+  const [showReserva, setShowReserva] = useState(false);
 
   useEffect(() => {
     if (!localStorage.getItem('token')) {
@@ -118,7 +128,7 @@ export default function AdminCuentaCorrientePage() {
   const caja = general?.caja.caja ?? 0;
   const transferible = fila?.transferible ?? 0;
 
-  function abrirForm(tipo: 'DEBITO' | 'APORTE') {
+  function abrirForm(tipo: TipoForm) {
     setTipoForm(tipo);
     setForm({ monto: tipo === 'DEBITO' && transferible > 0 ? transferible.toFixed(2) : '', descripcion: '' });
     setShowForm(true);
@@ -136,7 +146,7 @@ export default function AdminCuentaCorrientePage() {
           propietarioId: selectedId,
           tipoMovimiento: tipoForm,
           monto: Math.abs(parseFloat(form.monto)),
-          descripcion: form.descripcion || (tipoForm === 'APORTE' ? 'Aporte para gastos' : 'Transferencia al propietario'),
+          descripcion: form.descripcion || FORM_TEXTOS[tipoForm].porDefecto,
         }),
       });
       if (res.ok) {
@@ -230,12 +240,30 @@ export default function AdminCuentaCorrientePage() {
               />
             </section>
 
+            {showReserva && (
+              <ReservaMultiple
+                propietarios={general.propietarios}
+                caja={caja}
+                headers={headers}
+                onCancel={() => setShowReserva(false)}
+                onDone={() => { setShowReserva(false); fetchGeneral(); }}
+              />
+            )}
+
             <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                 <div>
                   <h2 className="font-bold text-teal-700">Saldos de todos los propietarios</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">Saldo = su parte de cobros − su parte de gastos + aportes − transferencias ± ajustes</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Saldo = su parte de cobros − su parte de gastos + aportes − transferencias − reservas al fondo ± ajustes</p>
                 </div>
+                <button
+                  onClick={() => setShowReserva(v => !v)}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    showReserva ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'text-teal-700 bg-aqua-100 hover:bg-aqua-200'
+                  }`}
+                >
+                  {showReserva ? <><X className="h-4 w-4" /> Cancelar</> : <><PiggyBank className="h-4 w-4" /> Reserva al fondo</>}
+                </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -273,7 +301,10 @@ export default function AdminCuentaCorrientePage() {
                           <td className="px-3 py-3 text-right tabular-nums text-gray-600">{fmt0(p.cobros)}</td>
                           <td className="px-3 py-3 text-right tabular-nums text-gray-600">−{fmt0(p.gastos)}</td>
                           <td className="px-3 py-3 text-right tabular-nums text-gray-600">{p.aportes > 0 ? `+${fmt0(p.aportes)}` : '—'}</td>
-                          <td className="px-3 py-3 text-right tabular-nums text-gray-600">{p.retiros > 0 ? `−${fmt0(p.retiros)}` : '—'}</td>
+                          <td className="px-3 py-3 text-right tabular-nums text-gray-600">
+                            {p.retiros > 0 ? `−${fmt0(p.retiros)}` : '—'}
+                            {p.reservas > 0 && <span className="block text-xs text-teal-600">−{fmt0(p.reservas)} al fondo</span>}
+                          </td>
                           <td className={`px-3 py-3 text-right tabular-nums font-bold ${positivo ? 'text-teal-600' : 'text-copper-600'}`}>{fmt(p.saldo)}</td>
                           <td className="px-3 py-3 hidden lg:table-cell">
                             <div className="relative h-2 rounded-full bg-gray-100">
@@ -300,7 +331,12 @@ export default function AdminCuentaCorrientePage() {
                       <td className="px-3 py-3 text-right tabular-nums">{fmt0(general.propietarios.reduce((s, p) => s + p.cobros, 0))}</td>
                       <td className="px-3 py-3 text-right tabular-nums">−{fmt0(general.propietarios.reduce((s, p) => s + p.gastos, 0))}</td>
                       <td className="px-3 py-3 text-right tabular-nums">+{fmt0(general.propietarios.reduce((s, p) => s + p.aportes, 0))}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">−{fmt0(general.propietarios.reduce((s, p) => s + p.retiros, 0))}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        −{fmt0(general.propietarios.reduce((s, p) => s + p.retiros, 0))}
+                        {general.propietarios.some(p => p.reservas > 0) && (
+                          <span className="block text-xs font-normal text-teal-600">−{fmt0(general.propietarios.reduce((s, p) => s + p.reservas, 0))} al fondo</span>
+                        )}
+                      </td>
                       <td className={`px-3 py-3 text-right tabular-nums ${general.totales.saldoNeto >= 0 ? 'text-teal-700' : 'text-copper-600'}`}>{fmt(general.totales.saldoNeto)}</td>
                       <td colSpan={3} className="px-3 py-3 text-xs font-normal text-gray-500">
                         {Math.abs(general.totales.saldoNeto - caja) < 1
@@ -350,6 +386,14 @@ export default function AdminCuentaCorrientePage() {
                             <ArrowDownLeft className="h-4 w-4" /> Registrar aporte
                           </button>
                           <button
+                            onClick={() => abrirForm('RESERVA')}
+                            disabled={transferible <= 0}
+                            title={transferible <= 0 ? 'No hay saldo disponible en caja para reservar' : 'Mandar parte del saldo al fondo de reserva común'}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-teal-700 bg-aqua-100 hover:bg-aqua-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            <PiggyBank className="h-4 w-4" /> Reservar al fondo
+                          </button>
+                          <button
                             onClick={() => abrirForm('DEBITO')}
                             disabled={transferible <= 0}
                             title={transferible <= 0 ? 'No hay monto transferible' : ''}
@@ -379,9 +423,7 @@ export default function AdminCuentaCorrientePage() {
               {showForm && (
                 <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md border border-copper-200 p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-teal-700">
-                      {tipoForm === 'APORTE' ? 'Registrar aporte · el propietario pone plata para cubrir gastos' : 'Registrar transferencia al propietario'}
-                    </h3>
+                    <h3 className="font-bold text-teal-700">{FORM_TEXTOS[tipoForm].titulo}</h3>
                     <button type="button" onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
                   </div>
                   <div className="grid gap-4 md:grid-cols-3">
@@ -389,17 +431,17 @@ export default function AdminCuentaCorrientePage() {
                       <label className="block text-sm font-medium text-gray-600 mb-1">Monto ($)</label>
                       <input
                         type="number" step="0.01" min="0.01" required autoFocus
-                        max={tipoForm === 'DEBITO' ? transferible.toFixed(2) : undefined}
+                        max={tipoForm !== 'APORTE' ? transferible.toFixed(2) : undefined}
                         value={form.monto} onChange={e => setForm({ ...form, monto: e.target.value })}
                         className={inputCls}
                       />
-                      {tipoForm === 'DEBITO' && <p className="text-xs text-gray-500 mt-1">Máximo transferible: {fmt(transferible)}</p>}
+                      {tipoForm !== 'APORTE' && <p className="text-xs text-gray-500 mt-1">Máximo disponible: {fmt(transferible)}</p>}
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-600 mb-1">Descripción</label>
                       <input
                         type="text" value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })}
-                        placeholder={tipoForm === 'APORTE' ? 'Ej: aporte 04/11/26 para pago monotributo' : 'Ej: transferencia noviembre'}
+                        placeholder={FORM_TEXTOS[tipoForm].placeholder}
                         className={inputCls}
                       />
                     </div>
@@ -407,18 +449,25 @@ export default function AdminCuentaCorrientePage() {
                   <div className="flex justify-end gap-2 mt-5">
                     <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 rounded-lg text-sm text-gray-600 bg-gray-100 hover:bg-gray-200">Cancelar</button>
                     <button type="submit" disabled={loading} className="px-5 py-2 rounded-lg text-sm font-semibold text-white bg-copper-400 hover:bg-copper-500 disabled:opacity-50">
-                      {loading ? 'Guardando...' : tipoForm === 'APORTE' ? 'Confirmar aporte' : 'Confirmar transferencia'}
+                      {loading ? 'Guardando...' : FORM_TEXTOS[tipoForm].confirmar}
                     </button>
                   </div>
+                  {tipoForm === 'RESERVA' && (
+                    <p className="text-xs text-gray-500 mt-3">
+                      Baja el saldo del propietario y sale de la caja, igual que una transferencia, pero la plata entra al fondo de reserva común
+                      para pagar gastos futuros. Se ve en <a href="/admin/fondo" className="underline">Fondo de reserva</a>.
+                    </p>
+                  )}
                 </form>
               )}
 
               {/* Composición del saldo */}
-              <section className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+              <section className="grid gap-4 grid-cols-2 lg:grid-cols-6">
                 <Composicion titulo="Cobros (su parte)" valor={fila.cobros} signo="+" icon={Wallet} />
                 <Composicion titulo="Gastos (su parte)" valor={fila.gastos} signo="−" icon={Receipt} />
-                <Composicion titulo="Aportes" valor={fila.aportes} signo="+" icon={PiggyBank} />
+                <Composicion titulo="Aportes" valor={fila.aportes} signo="+" icon={ArrowDownLeft} />
                 <Composicion titulo="Transferido" valor={fila.retiros} signo="−" icon={Send} />
+                <Composicion titulo="Reservado al fondo" valor={fila.reservas} signo="−" icon={PiggyBank} />
                 <div className={`rounded-xl p-4 border-2 ${fila.saldo >= 0 ? 'border-teal-200 bg-teal-50/50' : 'border-copper-200 bg-copper-50/50'} col-span-2 lg:col-span-1`}>
                   <p className="text-xs font-semibold text-gray-600">= Saldo</p>
                   <p className={`text-xl font-bold tabular-nums mt-1 ${fila.saldo >= 0 ? 'text-teal-700' : 'text-copper-600'}`}>{fmt(fila.saldo)}</p>
@@ -484,7 +533,7 @@ export default function AdminCuentaCorrientePage() {
                       <tbody className="divide-y divide-gray-100">
                         {movFiltrados.map(mov => {
                           const t = TIPOS[mov.tipoMovimiento] || { label: mov.tipoMovimiento, credito: false, cls: 'bg-gray-100 text-gray-600' };
-                          const borrable = mov.tipoMovimiento === 'DEBITO' || mov.tipoMovimiento === 'APORTE';
+                          const borrable = ['DEBITO', 'APORTE', 'RESERVA'].includes(mov.tipoMovimiento);
                           return (
                             <tr key={mov.id} className="group hover:bg-gray-50/70">
                               <td className="px-5 py-2.5 text-gray-600 whitespace-nowrap tabular-nums">{fmtFecha(mov.fecha)}</td>
@@ -521,6 +570,152 @@ export default function AdminCuentaCorrientePage() {
         )}
       </div>
     </main>
+  );
+}
+
+/** Reserva al fondo sacando de uno, varios o todos los propietarios a la vez. */
+function ReservaMultiple({ propietarios, caja, headers, onCancel, onDone }: {
+  propietarios: FilaResumen[];
+  caja: number;
+  headers: (json?: boolean) => HeadersInit;
+  onCancel: () => void;
+  onDone: () => void;
+}) {
+  const [seleccion, setSeleccion] = useState<Set<number>>(new Set(propietarios.map(p => p.propietario.id)));
+  const [total, setTotal] = useState('');
+  const [montos, setMontos] = useState<Record<number, string>>({});
+  const [descripcion, setDescripcion] = useState('');
+  const [guardando, setGuardando] = useState(false);
+
+  // Reparte el total en partes iguales entre los seleccionados (centavos sobrantes a los primeros)
+  function repartir(totalStr: string, sel: Set<number>) {
+    const ids = propietarios.map(p => p.propietario.id).filter(id => sel.has(id));
+    const cent = Math.round((parseFloat(totalStr) || 0) * 100);
+    const nuevo: Record<number, string> = {};
+    if (ids.length > 0 && cent > 0) {
+      const base = Math.floor(cent / ids.length), resto = cent - base * ids.length;
+      ids.forEach((id, i) => { nuevo[id] = ((base + (i < resto ? 1 : 0)) / 100).toFixed(2); });
+    }
+    setMontos(nuevo);
+  }
+
+  function toggle(id: number) {
+    const s = new Set(seleccion);
+    s.has(id) ? s.delete(id) : s.add(id);
+    setSeleccion(s);
+    repartir(total, s);
+  }
+
+  const items = propietarios
+    .filter(p => seleccion.has(p.propietario.id))
+    .map(p => ({ fila: p, monto: parseFloat(montos[p.propietario.id] || '0') || 0 }));
+  const suma = items.reduce((s, i) => s + i.monto, 0);
+  const excedidos = items.filter(i => i.monto > Math.max(0, i.fila.saldo) + 0.005);
+  const superaCaja = suma > caja + 0.005;
+  const valido = items.some(i => i.monto > 0) && excedidos.length === 0 && !superaCaja;
+
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault();
+    if (!valido) return;
+    setGuardando(true);
+    try {
+      const res = await fetch(`${API}/cuenta-corriente/reserva`, {
+        method: 'POST',
+        headers: headers(true),
+        body: JSON.stringify({
+          items: items.filter(i => i.monto > 0).map(i => ({ propietarioId: i.fila.propietario.id, monto: i.monto })),
+          descripcion: descripcion.trim() || undefined,
+        }),
+      });
+      if (res.ok) onDone();
+      else {
+        let msg = 'Error al registrar la reserva';
+        try { const err = await res.json(); if (err?.message) msg = err.message; } catch {}
+        alert(msg);
+      }
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <form onSubmit={guardar} className="bg-white rounded-xl shadow-md border border-copper-200 p-6">
+      <h3 className="font-bold text-teal-700">Reserva al fondo</h3>
+      <p className="text-sm text-gray-500 mt-1 mb-5">
+        Parte del saldo de los propietarios elegidos pasa de la caja al fondo de reserva común. Baja su saldo igual que una transferencia.
+      </p>
+
+      <div className="grid gap-4 md:grid-cols-3 mb-5">
+        <div>
+          <label className="block text-sm font-medium text-gray-600 mb-1">Total a reservar ($)</label>
+          <input
+            type="number" step="0.01" min="0.01" autoFocus value={total}
+            onChange={e => { setTotal(e.target.value); repartir(e.target.value, seleccion); }}
+            className={`${inputCls} text-lg font-semibold`}
+          />
+          <p className="text-xs text-gray-500 mt-1">Caja disponible: {fmt(caja)}</p>
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-600 mb-1">Descripción</label>
+          <input type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Ej: reserva distribución noviembre" className={inputCls} />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 text-xs">
+          <span className="font-medium text-gray-600">Sacar de ({seleccion.size} de {propietarios.length})</span>
+          <div className="flex gap-3 font-medium">
+            <button type="button" onClick={() => { const s = new Set(propietarios.map(p => p.propietario.id)); setSeleccion(s); repartir(total, s); }} className="text-copper-500 hover:text-copper-600">Todos</button>
+            <button type="button" onClick={() => { setSeleccion(new Set()); setMontos({}); }} className="text-gray-500 hover:text-gray-700">Ninguno</button>
+          </div>
+        </div>
+        <div className="divide-y divide-gray-100">
+          {propietarios.map(p => {
+            const id = p.propietario.id;
+            const sel = seleccion.has(id);
+            const monto = parseFloat(montos[id] || '0') || 0;
+            const excede = sel && monto > Math.max(0, p.saldo) + 0.005;
+            return (
+              <div key={id} className={`flex flex-wrap items-center gap-3 px-4 py-2.5 ${sel ? '' : 'opacity-50'}`}>
+                <button type="button" onClick={() => toggle(id)} className="flex items-center gap-2 flex-1 min-w-[12rem] text-left">
+                  <span className={`h-4 w-4 shrink-0 rounded border flex items-center justify-center ${sel ? 'bg-teal-500 border-teal-500' : 'border-gray-300'}`}>
+                    {sel && <CheckCircle2 className="h-3 w-3 text-white" />}
+                  </span>
+                  <span className="text-sm font-medium text-teal-700">{p.propietario.nombre}</span>
+                </button>
+                <span className={`text-xs tabular-nums ${p.saldo < 0 ? 'text-copper-600' : 'text-gray-500'}`}>Saldo {fmt(p.saldo)}</span>
+                <input
+                  type="number" step="0.01" min="0" disabled={!sel}
+                  value={montos[id] ?? ''}
+                  onChange={e => setMontos({ ...montos, [id]: e.target.value })}
+                  className={`w-36 px-2 py-1.5 border rounded-lg text-right tabular-nums text-sm ${excede ? 'border-copper-300 bg-copper-50 text-copper-700' : 'border-gray-200 text-gray-900'}`}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-4 mt-5 pt-5 border-t border-gray-100">
+        <div className="text-sm">
+          <p className="text-gray-600">Total a reservar: <strong className="tabular-nums">{fmt(suma)}</strong></p>
+          {excedidos.length > 0 && (
+            <p className="text-copper-600 flex items-center gap-1 mt-0.5">
+              <AlertTriangle className="h-4 w-4" /> Supera el saldo de {excedidos.map(i => i.fila.propietario.nombre.split(' ')[0]).join(', ')}
+            </p>
+          )}
+          {superaCaja && (
+            <p className="text-copper-600 flex items-center gap-1 mt-0.5"><AlertTriangle className="h-4 w-4" /> Supera la caja disponible ({fmt(caja)})</p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg text-sm text-gray-600 bg-gray-100 hover:bg-gray-200">Cancelar</button>
+          <button type="submit" disabled={!valido || guardando} className="px-5 py-2 rounded-lg text-sm font-semibold text-white bg-copper-400 hover:bg-copper-500 disabled:opacity-40 disabled:cursor-not-allowed">
+            {guardando ? 'Guardando...' : `Reservar ${fmt(suma)}`}
+          </button>
+        </div>
+      </div>
+    </form>
   );
 }
 

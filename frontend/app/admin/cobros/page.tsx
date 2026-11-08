@@ -97,7 +97,8 @@ export default function AdminCobrosPage() {
   // Una fila por inmueble con lo que pasó en el período
   const filas = useMemo(() => inmuebles.map(inm => {
     const cobrosP = cobros.filter(c => c.inmuebleId === inm.id && c.periodo === periodo);
-    const gastosP = gastosMes.filter(g => g.inmuebleId === inm.id);
+    // Los gastos pagados con el fondo de reserva no descuentan del neto de los propietarios
+    const gastosP = gastosMes.filter(g => g.inmuebleId === inm.id && (g as any).pagadoCon !== 'FONDO');
     const cobrado = cobrosP.reduce((s, c) => s + num(c.montoBruto), 0);
     const gastos = gastosP.reduce((s, g) => s + num(g.monto), 0);
     const anterior = cobroAnterior(inm.id, periodo);

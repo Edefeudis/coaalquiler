@@ -40,7 +40,7 @@ export class DistribucionService{
     // Obtener gastos del periodo
     const[periodoIni,periodoFin]=this.rangoPeriodo(cobro.periodo);
     const gastos=await this.prisma.gastoInmueble.findMany({
-      where:{inmuebleId:cobro.inmuebleId,fecha:{gte:periodoIni,lte:periodoFin}},
+      where:{inmuebleId:cobro.inmuebleId,fecha:{gte:periodoIni,lte:periodoFin},pagadoCon:'CAJA'},
     });
     const totalGastos=gastos.reduce((sum,g)=>sum+Number(g.monto),0);
 
